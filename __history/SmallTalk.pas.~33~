@@ -1,0 +1,119 @@
+unit SmallTalk;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, IdAntiFreezeBase, Vcl.IdAntiFreeze,
+  IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient, Vcl.StdCtrls,
+  strutils, IdCmdTCPClient, IdMessage;
+
+type
+  TFormSmallTalk = class(TForm)
+    MsgMemo: TMemo;
+    TCP: TIdTCPClient;
+    MessageBox: TEdit;
+    SendMsgButton: TButton;
+    procedure SendMsgButtonClick(Sender: TObject);
+    procedure TCPConnected(Sender: TObject);
+    Function connect: Boolean;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    procedure ConnectToServer(const AServer: string; const APort: Integer);
+  end;
+
+  TClientHandleThread = Class(TThread)          //Class Thread
+  Private
+     Msg:string[100];
+     Procedure HandleInput;   //Input of Transfer data
+  Protected
+     Procedure Execute; Override;  //Excute the client
+  End;
+
+var
+  FormSmallTalk: TFormSmallTalk;
+  CHThread : TClientHandleThread;
+
+
+implementation
+
+{$R *.dfm}
+uses
+  Client;
+
+
+procedure TClientHandleThread.Execute;
+begin
+While Not Terminated Do
+ Begin
+  IF Not FormClient.TCP.Connected Then
+    Terminate
+  Else
+  Try
+    msg:=FormClient.Tcp.IOHandler.ReadLn;
+    Synchronize(HandleInput);
+  Except
+  End;
+End;
+end;
+
+Procedure TClientHandleThread.HandleInput;
+var  s,t:string;
+begin
+t:=MidStr(msg,1,5);
+s:=RightStr(msg, length(msg)-5);
+
+if t='list:' then
+  begin
+  FormClient.ClientList.Items.Delimiter:=':';
+  FormClient.ClientList.Items.DelimitedText:=s
+  end
+else
+  FormClient.TMsgMemo.Lines.Add(msg);
+end;
+
+function TFormSmallTalk.Connect: Boolean;
+begin
+  Try
+  Tcp.Host:=FormClient.IPNumber.Text;
+  Tcp.Port:=StrToInt(FormClient.PortNumber.text);
+  Tcp.Connect;
+  CHThread := TClientHandleThread.Create(True);
+  CHThread.FreeOnTerminate:=True;
+  CHThread.Resume;
+  Result := True;
+Except
+  Result := False;
+End;
+end;
+
+procedure TFormSmallTalk.SendMsgButtonClick(Sender: TObject);
+begin
+  if FormClient.ClientList.ItemIndex > -1 then
+      TCP.IOHandler.WriteLn('Chat:' + '>' + FormClient.UserName.text + ': ' + FormClient.TMessageBox.Text);
+end;
+
+procedure TFormSmallTalk.TCPConnected(Sender: TObject);
+begin
+  TCP.IOHandler.WriteLn('채팅이 연결되었습니다.');
+end;
+
+procedure TFormSmallTalk.ConnectToServer(const AServer: string; const APort: Integer);
+begin
+  try
+    TCP.Host := AServer;
+    TCP.Port := APort;
+    TCP.Connect;
+    ShowMessage('서버에 성공적으로 연결되었습니다.');
+  except
+    on E: Exception do
+    begin
+      ShowMessage('서버 연결에 실패하였습니다: ' + E.Message);
+    end;
+  end;
+end;
+
+end.
+

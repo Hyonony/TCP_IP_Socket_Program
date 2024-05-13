@@ -1,0 +1,37 @@
+object FormSmallTalk: TFormSmallTalk
+  Left = 0
+  Top = 0
+  Caption = 'SmallTalk'
+  ClientHeight = 491
+  ClientWidth = 535
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object TMsgMemo: TMemo
+    Left = 24
+    Top = 27
+    Width = 489
+    Height = 350
+    Color = clCream
+    ReadOnly = True
+    TabOrder = 0
+  end
+  object idtcpclntTCP: TIdTCPClient
+    ConnectTimeout = 0
+    IPVersion = Id_IPv4
+    Port = 0
+    ReadTimeout = -1
+    Left = 192
+    Top = 224
+  end
+  object idntfrz1: TIdAntiFreeze
+    Left = 232
+    Top = 224
+  end
+end

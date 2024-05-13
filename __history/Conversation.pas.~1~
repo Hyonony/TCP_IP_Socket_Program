@@ -1,0 +1,35 @@
+unit Conversation;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Datasnap.DBClient,
+  Datasnap.Provider, Data.SqlExpr, Vcl.Grids, Vcl.DBGrids, Vcl.StdCtrls;
+
+type
+  TFormConversation1 = class(TForm)
+    ClientList: TListBox;
+    ClientslistText: TStaticText;
+    EchoSearchButton: TButton;
+    WhisperSearchButton: TButton;
+    Tdbgrd: TDBGrid;
+    FriendSearchButton: TButton;
+    AllSearchButton: TButton;
+    SQLConnection: TSQLConnection;
+    Tdtstprvdr: TDataSetProvider;
+    ClientDataSet: TClientDataSet;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  FormConversation1: TFormConversation1;
+
+implementation
+
+{$R *.dfm}
+
+end.

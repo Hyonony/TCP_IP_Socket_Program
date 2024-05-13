@@ -1,0 +1,58 @@
+unit Conversation;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Data.DB, Data.SqlExpr,
+  Vcl.Grids, Vcl.DBGrids, Datasnap.DBClient, Datasnap.Provider;
+
+ClientList           : TListBox;
+    ClientListText       : TStaticText;
+    EchoSearchButton     : TButton;
+    WhisperSearchButton  : TButton;
+    SQLConnection        : TSQLConnection;
+    Tdbgrd               : TDBGrid;
+    Tdtstprvdr           : TDataSetProvider;
+    ClientDataSet        : TClientDataSet;
+    FriendSearchButton   : TButton;
+    AllSearchButton      : TButton;
+
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+    procedure ConnectToDatabase;
+    procedure SetupDatabaseComponents(var SQLQuery: TSQLQuery; var DataSetProvider: TDataSetProvider;
+  var ClientDataSet: TClientDataSet; var DataSource: TDataSource; var DBGrid: TDBGrid; const MessageType: string;
+  const UserID: Integer);
+    procedure ConfigureDBGrid(DBGrid: TDBGrid);
+
+    function GetUserIDByUserName(const UserName: String): Integer;
+    procedure ShowEchoMessages(const UserID : Integer);
+    procedure ShowWhisperMessages(const UserID : Integer);
+    procedure ShowFriendMessages(const UserID : Integer);
+    procedure ShowAllMessages(const UserID : Integer);
+    procedure UpdateAllUsers;
+
+    procedure EchoSearchButtonClick(Sender: TObject);
+    procedure WhisperSearchButtonClick(Sender: TObject);
+    procedure FriendSearchButtonClick(Sender: TObject);
+    procedure AllSearchButtonClick(Sender: TObject);
+
+
+  private
+    { Private declarations }
+    procedure MessageTextGetText(Sender: TField; var Text: string; DisplayText: Boolean);
+  public
+    { Public declarations }
+  end;
+
+var
+  FormConversation: TFormConversation;
+
+
+implementation
+
+{$R *.dfm}
+
+end.

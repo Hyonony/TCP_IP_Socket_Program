@@ -1,0 +1,48 @@
+unit FriendRequest;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TFormFriendRequest = class(TForm)
+    RequestLabel: TLabel;
+    UserNameLabel: TLabel;
+    AcceptButton: TButton;
+    RejectButton: TButton;
+    procedure AcceptButtonClick(Sender: TObject);
+    procedure RejectButtonClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    AcceptOK : Boolean;
+  end;
+
+var
+  FormFriendRequest: TFormFriendRequest;
+
+implementation
+
+{$R *.dfm}
+
+procedure TFormFriendRequest.AcceptButtonClick(Sender: TObject);
+begin
+  AcceptOK := True;
+  Close;
+end;
+
+procedure TFormFriendRequest.FormCreate(Sender: TObject);
+begin
+  AcceptOK := False;
+end;
+
+procedure TFormFriendRequest.RejectButtonClick(Sender: TObject);
+begin
+  AcceptOK := False;
+  Close;
+end;
+
+end.

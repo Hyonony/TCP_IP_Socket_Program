@@ -1,0 +1,16 @@
+program TCPclient;
+
+uses
+  Vcl.Forms,
+  Client in 'Client.pas' {FormClient},
+  FriendRequest in 'FriendRequest.pas' {FormFriendRequest};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TFormClient, FormClient);
+  Application.CreateForm(TFormFriendRequest, FormFriendRequest);
+  Application.Run;
+end.

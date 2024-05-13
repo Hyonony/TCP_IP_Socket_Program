@@ -1,0 +1,55 @@
+object FormSmallTalk: TFormSmallTalk
+  Left = 0
+  Top = 0
+  Caption = 'SmallTalk'
+  ClientHeight = 491
+  ClientWidth = 535
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object MsgMemo: TMemo
+    Left = 24
+    Top = 27
+    Width = 489
+    Height = 350
+    Color = clCream
+    ReadOnly = True
+    TabOrder = 0
+  end
+  object MessageBox: TEdit
+    Left = 24
+    Top = 429
+    Width = 385
+    Height = 21
+    TabOrder = 1
+    Text = #47700#49464#51648#47484' '#51077#47141#54644#51452#49464#50836'.'
+  end
+  object SendMsgButton: TButton
+    Left = 431
+    Top = 406
+    Width = 82
+    Height = 44
+    Caption = #48372#45236#44592
+    Enabled = False
+    TabOrder = 2
+    OnClick = SendMsgButtonClick
+  end
+  object TCP: TIdTCPClient
+    ConnectTimeout = 0
+    IPVersion = Id_IPv4
+    Port = 0
+    ReadTimeout = -1
+    Left = 400
+    Top = 304
+  end
+  object idntfrz1: TIdAntiFreeze
+    Left = 440
+    Top = 304
+  end
+end

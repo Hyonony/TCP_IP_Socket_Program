@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899-12-30 00:00:00.000.262,C:\Users\PCuser\Documents\RAD Studio\Projects\Project1.dproj=C:\Users\PCuser\Documents\RAD Studio\Projects\TCPserver.dproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.957,C:\Users\PCuser\Documents\RAD Studio\Projects\TCPserver.dproj=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\TCPserver.dproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.725,C:\Users\PCuser\Documents\RAD Studio\Projects\Server.pas=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Server.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.932,C:\Users\PCuser\Documents\RAD Studio\Projects\Unit3.pas=C:\Users\PCuser\Documents\RAD Studio\Projects\Server.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.932,C:\Users\PCuser\Documents\RAD Studio\Projects\Unit3.dfm=C:\Users\PCuser\Documents\RAD Studio\Projects\Server.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.725,C:\Users\PCuser\Documents\RAD Studio\Projects\Server.dfm=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Server.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.259,=C:\Users\PCuser\Documents\RAD Studio\Projects\Unit3.pas</Transaction>
+  </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="Server.pas"/>
+    <File Path="Server.dfm"/>
+  </ProjectSortOrder>
+</BorlandProject>

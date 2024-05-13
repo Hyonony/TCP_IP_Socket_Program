@@ -1,0 +1,447 @@
+unit ConversationList;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Data.DB, Data.SqlExpr,
+  Vcl.Grids, Vcl.DBGrids, Datasnap.DBClient, Datasnap.Provider;
+
+type
+  TFormConversation = class(TForm)
+    ClientList           : TListBox;
+    ClientListText       : TStaticText;
+    EchoSearchButton     : TButton;
+    WhisperSearchButton  : TButton;
+    SQLConnection        : TSQLConnection;
+    Tdbgrd               : TDBGrid;
+    Tdtstprvdr           : TDataSetProvider;
+    ClientDataSet        : TClientDataSet;
+    FriendSearchButton   : TButton;
+    AllSearchButton      : TButton;
+
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+    procedure ConnectToDatabase;
+    procedure SetupDatabaseComponents(var SQLQuery: TSQLQuery; var DataSetProvider: TDataSetProvider;
+  var ClientDataSet: TClientDataSet; var DataSource: TDataSource; var DBGrid: TDBGrid; const MessageType: string;
+  const UserID: Integer);
+    procedure ConfigureDBGrid(DBGrid: TDBGrid);
+
+    function GetUserIDByUserName(const UserName: String): Integer;
+    procedure ShowEchoMessages(const UserID : Integer);
+    procedure ShowWhisperMessages(const UserID : Integer);
+    procedure ShowFriendMessages(const UserID : Integer);
+    procedure ShowAllMessages(const UserID : Integer);
+    procedure UpdateAllUsers;
+
+    procedure EchoSearchButtonClick(Sender: TObject);
+    procedure WhisperSearchButtonClick(Sender: TObject);
+    procedure FriendSearchButtonClick(Sender: TObject);
+    procedure AllSearchButtonClick(Sender: TObject);
+
+
+  private
+    { Private declarations }
+    procedure MessageTextGetText(Sender: TField; var Text: string; DisplayText: Boolean);
+  public
+    { Public declarations }
+  end;
+
+var
+  FormConversation: TFormConversation;
+
+
+implementation
+
+{$R *.dfm}
+
+// Conversation Form 생성자
+procedure TFormConversation.FormCreate(Sender: TObject);
+begin
+  ConnectToDatabase;
+
+  UpdateAllUsers;
+end;
+
+// Conversation Form 소멸자
+procedure TFormConversation.FormClose(Sender: TObject;
+  var Action: TCloseAction);
+begin
+  Close;
+end;
+
+// Connect to Database
+procedure TFormConversation.ConnectToDatabase;
+begin
+  SQLConnection := TSQLConnection.Create(nil);
+  try
+    SQLConnection.DriverName := 'MySQL';
+    SQLConnection.GetDriverFunc := 'getSQLDriverMYSQL';
+    SQLConnection.LibraryName := 'dbxmys.dll';
+    SQLConnection.VendorLib := 'libmysql.dll';
+    SQLConnection.Params.Values['HostName']  := 'localhost'; // 데이터베이스 호스트
+    SQLConnection.Params.Values['Database']  := 'Clients'; // 데이터베이스 이름
+    SQLConnection.Params.Values['User_Name'] := 'root'; // 사용자 이름
+    SQLConnection.Params.Values['Password']  := '1234'; // 비밀번호
+    SQLConnection.LoginPrompt := False;
+    SQLConnection.Connected := True;
+  except
+    on E: Exception do
+      ShowMessage('데이터베이스 연결 실패: ' + E.Message);
+  end;
+end;
+
+// Query 문 (전체 메시지, 귓속말)
+procedure TFormConversation.SetupDatabaseComponents(var SQLQuery: TSQLQuery; var DataSetProvider: TDataSetProvider;
+  var ClientDataSet: TClientDataSet; var DataSource: TDataSource; var DBGrid: TDBGrid; const MessageType: string;
+  const UserID: Integer);
+begin
+  SQLQuery        := TSQLQuery.Create(nil);
+  DataSetProvider := TDataSetProvider.Create(nil);
+  ClientDataSet   := TClientDataSet.Create(nil);
+  DataSource      := TDataSource.Create(nil);
+  DBGrid          := TDBGrid.Create(nil);
+
+  SQLQuery.SQLConnection := SQLConnection;
+
+  if MessageType = 'Echo' then
+  begin
+    SQLQuery.SQL.Text := 'SELECT U1.Username AS SenderName, U2.Username AS ReceiverName, M.MessageText, M.MessageType '+
+                         'FROM Message M '+
+                         'INNER JOIN user U1 ON M.SenderID = U1.UserID '+
+                         'INNER JOIN user U2 ON M.ReceiveID = U2.UserID '+
+                         'WHERE (M.SenderID = :UserID OR M.ReceiveID = :UserID) AND M.MessageType = ''Echo'' ORDER BY M.MessageID ASC;';
+
+  end
+  else if MessageType = 'Whisper' then
+  begin
+    SQLQuery.SQL.Text := 'SELECT U1.Username AS SenderName, U2.Username AS ReceiverName, M.MessageText, M.MessageType '+
+                         'FROM Message M '+
+                         'INNER JOIN user U1 ON M.SenderID = U1.UserID '+
+                         'INNER JOIN user U2 ON M.ReceiveID = U2.UserID '+
+                         'WHERE (M.SenderID = :UserID OR M.ReceiveID = :UserID) AND M.MessageType = ''Whisper'' ORDER BY M.MessageID ASC;';
+
+  end;
+
+  SQLQuery.ParamByName('UserID').AsInteger := UserID;
+  DataSetProvider.DataSet := SQLQuery;
+  ClientDataSet.SetProvider(DataSetProvider);
+  ClientDataSet.FieldDefs.Clear;
+  ClientDataSet.FieldDefs.Add('MessageText', ftString, 255);
+  ClientDataSet.Open;
+  ClientDataSet.FieldByName('MessageText').OnGetText := MessageTextGetText;
+  DataSource.DataSet := ClientDataSet;
+
+  DBGrid.Parent := Self;
+  DBGrid.Align := alCustom;
+  DBGrid.DataSource := DataSource;
+
+  ConfigureDBGrid(DBGrid);
+end;
+
+
+// DB Grid Size 설정
+procedure TFormConversation.ConfigureDBGrid(DBGrid: TDBGrid);
+begin
+  DBGrid.Left     := 152;
+  DBGrid.Top      := 48;
+  DBGrid.Width    := 566;
+  DBGrid.Height   := 303;
+end;
+
+// DB Message Text를 DB에 채워주는 메서드
+procedure TFormConversation.MessageTextGetText(Sender: TField; var Text: string; DisplayText: Boolean);
+begin
+  Text := Sender.AsString;
+end;
+
+
+// User Name을 통해 User Id 검출 쿼리
+function TFormConversation.GetUserIDByUserName(const UserName: String): Integer;
+var
+  SQLQuery: TSQLQuery;
+begin
+  Result := -1;
+
+  if not SQLConnection.Connected then Exit;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+    SQLQuery.SQL.Text := 'SELECT UserID FROM User WHERE Username = :Username';
+    SQLQuery.Params.ParamByName('Username').AsString := UserName;
+    SQLQuery.Open;
+
+    if not SQLQuery.IsEmpty then
+      Result := SQLQuery.Fields[0].AsInteger; // UserID 값을 반환
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// 전체 메시지 DB에서 꺼내서 보여주기
+procedure TFormConversation.ShowEchoMessages(const UserID: Integer);
+var
+  SQLQuery: TSQLQuery;
+  DataSetProvider: TDataSetProvider;
+  ClientDataSet: TClientDataSet;
+  DataSource: TDataSource;
+  DBGrid: TDBGrid;
+  CloseButton: TButton;
+begin
+  try
+    SetupDatabaseComponents(SQLQuery, DataSetProvider, ClientDataSet, DataSource, DBGrid, 'Echo', UserID);
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('데이터 조회 실패: ' + E.Message);
+      SQLQuery.Free;
+      DataSetProvider.Free;
+      ClientDataSet.Free;
+      DataSource.Free;
+      DBGrid.Free;
+    end;
+  end;
+end;
+
+// 귓속말 메세지 DB에서 꺼내서 보여주기
+procedure TFormConversation.ShowWhisperMessages(const UserID: Integer);
+var
+  SQLQuery: TSQLQuery;
+  DataSetProvider: TDataSetProvider;
+  ClientDataSet: TClientDataSet;
+  DataSource: TDataSource;
+  DBGrid: TDBGrid;
+begin
+  try
+    SetupDatabaseComponents(SQLQuery, DataSetProvider, ClientDataSet, DataSource, DBGrid, 'Whisper', UserID);
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('데이터 조회 실패: ' + E.Message);
+      SQLQuery.Free;
+      DataSetProvider.Free;
+      ClientDataSet.Free;
+      DataSource.Free;
+      DBGrid.Free;
+    end;
+  end;
+end;
+
+
+//친구와 대화 메시지 DB에서 꺼내서 보여주기
+procedure TFormConversation.ShowFriendMessages(const UserID : Integer);
+var
+  SQLQuery: TSQLQuery;
+  DataSetProvider: TDataSetProvider;
+  ClientDataSet: TClientDataSet;
+  DataSource: TDataSource;
+  DBGrid: TDBGrid;
+begin
+  SQLQuery := TSQLQuery.Create(nil);
+  DataSetProvider := TDataSetProvider.Create(nil);
+  ClientDataSet := TClientDataSet.Create(nil);
+  DataSource := TDataSource.Create(nil);
+  DBGrid := TDBGrid.Create(nil);
+
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+    SQLQuery.SQL.Text := 'SELECT U1.Username AS SenderName, U2.Username AS ReceiverName, M.MessageText, M.MessageType '+
+                         'FROM Message M '+
+                         'INNER JOIN user U1 ON M.SenderID = U1.UserID '+
+                         'INNER JOIN user U2 ON M.ReceiveID = U2.UserID '+
+                         'WHERE (M.SenderID = :UserID OR M.ReceiveID = :UserID) '+
+                         'AND EXISTS ('+
+                              'SELECT 1 '+
+                              'From Friend F '+
+                              'WHERE (F.UserID = M.SenderID AND F.FriendID = M.ReceiveID) '+
+                              'OR (F.UserID = M.ReceiveID AND F.FriendID = M.SenderID) '+
+                              ') '+
+                         'ORDER BY M.MessageID ASC;';
+
+    SQLQuery.ParamByName('UserID').AsInteger := UserID;
+
+    DataSetProvider.DataSet := SQLQuery;
+    ClientDataSet.SetProvider(DataSetProvider);
+
+    ClientDataSet.FieldDefs.Clear;
+    ClientDataSet.FieldDefs.Add('MessageText', ftString, 255);
+
+    ClientDataSet.Open;
+
+    ClientDataSet.FieldByName('MessageText').OnGetText := MessageTextGetText;
+
+    DataSource.DataSet := ClientDataSet;
+
+    DBGrid.Parent     := Self;
+    DBGrid.Align      := alCustom;
+    DBGrid.DataSource := DataSource;
+
+    ConfigureDBGrid(DBGrid);
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('데이터 조회 실패: ' + E.Message);
+      SQLQuery.Free;
+      DataSetProvider.Free;
+      ClientDataSet.Free;
+      DataSource.Free;
+      DBGrid.Free;
+    end;
+  end;
+end;
+
+//전체 대화 메시지 DB에서 꺼내서 보여주기
+procedure TFormConversation.ShowAllMessages(const UserID : Integer);
+  var
+  SQLQuery: TSQLQuery;
+  DataSetProvider: TDataSetProvider;
+  ClientDataSet: TClientDataSet;
+  DataSource: TDataSource;
+  DBGrid: TDBGrid;
+begin
+  SQLQuery := TSQLQuery.Create(nil);
+  DataSetProvider := TDataSetProvider.Create(nil);
+  ClientDataSet := TClientDataSet.Create(nil);
+  DataSource := TDataSource.Create(nil);
+  DBGrid := TDBGrid.Create(nil);
+
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+    SQLQuery.SQL.Text := 'SELECT U1.Username AS SenderName, U2.Username AS ReceiverName, M.MessageText, M.MessageType '+
+                         'FROM Message M '+
+                         'INNER JOIN user U1 ON M.SenderID = U1.UserID '+
+                         'INNER JOIN user U2 ON M.ReceiveID = U2.UserID '+
+                         'WHERE M.SenderID = :UserID OR M.ReceiveID = :UserID ORDER BY M.MessageID ASC;';
+
+    SQLQuery.ParamByName('UserID').AsInteger := UserID;
+
+    DataSetProvider.DataSet := SQLQuery;
+    ClientDataSet.SetProvider(DataSetProvider);
+
+    ClientDataSet.FieldDefs.Clear;
+    ClientDataSet.FieldDefs.Add('MessageText', ftString, 255);
+
+    ClientDataSet.Open;
+
+    ClientDataSet.FieldByName('MessageText').OnGetText := MessageTextGetText;
+
+    DataSource.DataSet  := ClientDataSet;
+
+    DBGrid.Parent       := Self;
+    DBGrid.Align        := alCustom;
+    DBGrid.DataSource   := DataSource;
+
+    ConfigureDBGrid(DBGrid);
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('데이터 조회 실패: ' + E.Message);
+      SQLQuery.Free;
+      DataSetProvider.Free;
+      ClientDataSet.Free;
+      DataSource.Free;
+      DBGrid.Free;
+    end;
+  end;
+end;
+
+// 처음 User 목록 DB에서 꺼내서 보여주기
+procedure TFormConversation.UpdateAllUsers;
+var
+  SQLQuery: TSQLQuery;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'SELECT Username FROM User';
+
+    SQLQuery.Open;
+
+    ClientList.Items.Clear;
+
+    while not SQLQuery.Eof do
+    begin
+      ClientList.Items.Add(SQLQuery.FieldByName('Username').AsString);
+      SQLQuery.Next;
+    end;
+
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// Echo 검색 버튼
+procedure TFormConversation.EchoSearchButtonClick(Sender: TObject);
+var
+  UserID : Integer;
+begin
+  UserID := GetUserIDByUserName(ClientList.Items[ClientList.ItemIndex]);
+
+  if ClientList.ItemIndex > -1 then
+    begin
+      ShowEchoMessages(UserID);
+    end
+  else
+    ShowMessage('검색할 클라이언트를 선택 후 버튼을 눌러주세요.');
+end;
+
+// 귓속말 검색 버튼
+procedure TFormConversation.WhisperSearchButtonClick(Sender: TObject);
+var
+  UserID : Integer;
+begin
+  UserID := GetUserIDByUserName(ClientList.Items[ClientList.ItemIndex]);
+
+  if ClientList.ItemIndex > -1 then
+    begin
+      ShowWhisperMessages(UserID);
+    end
+  else
+    ShowMessage('검색할 클라이언트를 선택 후 버튼을 눌러주세요.');
+end;
+
+// 친구만 검색 버튼
+procedure TFormConversation.FriendSearchButtonClick(Sender: TObject);
+var
+  UserID : Integer;
+begin
+  UserID := GetUserIDByUserName(ClientList.Items[ClientList.ItemIndex]);
+  if ClientList.ItemIndex > -1 then
+    begin
+      ShowFriendMessages(UserID);
+    end
+
+  else
+    ShowMessage('검색할 클라이언트를 선택 후 버튼을 눌러주세요.');
+end;
+
+// 전체 대화 검색 버튼 (Echo + Whisper)
+procedure TFormConversation.AllSearchButtonClick(Sender: TObject);
+var
+  UserID : Integer;
+begin
+  UserID := GetUserIDByUserName(ClientList.Items[ClientList.ItemIndex]);
+  if ClientList.ItemIndex > -1 then
+    begin
+      ShowAllMessages(UserID);
+    end
+
+  else
+    ShowMessage('검색할 클라이언트를 선택 후 버튼을 눌러주세요.');
+end;
+
+end.

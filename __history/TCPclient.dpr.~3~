@@ -1,0 +1,18 @@
+program TCPclient;
+
+uses
+  Vcl.Forms,
+  Client in 'Client.pas' {FormClient},
+  SmallTalk in 'SmallTalk.pas' {FormSmallTalk},
+  ChattingAgree in 'ChattingAgree.pas' {FormAgree};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TFormClient, FormClient);
+  Application.CreateForm(TFormSmallTalk, FormSmallTalk);
+  Application.CreateForm(TFormAgree, FormAgree);
+  Application.Run;
+end.

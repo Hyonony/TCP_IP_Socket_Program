@@ -1,0 +1,44 @@
+unit ChattingAgree;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TFormAgree = class(TForm)
+    OK: TButton;
+    Nagative: TButton;
+    AgreeText: TStaticText;
+    procedure OKClick(Sender: TObject);
+    procedure NagativeClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  FormAgree: TFormAgree;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  Client;
+
+procedure TFormAgree.OKClick(Sender: TObject);
+begin
+  FormClient.OKSignal = True;
+end;
+
+procedure TFormAgree.NagativeClick(Sender: TObject);
+begin
+  FormClient.OKSignal = False;
+end;
+
+
+
+end.

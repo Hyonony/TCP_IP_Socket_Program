@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899-12-30 00:00:00.000.900,=C:\Users\PCuser\Documents\RAD Studio\Projects\Unit3.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.024,=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.984,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.dfm=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\ChattingAgree.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.474,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Login.dfm=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.474,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Login.pas=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.984,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\ChattingAgree.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.810,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Client.pas=C:\Users\PCuser\Documents\RAD Studio\Projects\Client.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.128,=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.647,=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.054,=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.585,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\SmallTalk.pas=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.585,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\SmallTalk.dfm=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.810,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Client.dfm=C:\Users\PCuser\Documents\RAD Studio\Projects\Client.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.363,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\TCPclient.dproj=C:\Users\PCuser\Documents\RAD Studio\Projects\Project1.dproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.357,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\SmallTack.pas=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.695,C:\Users\PCuser\Documents\RAD Studio\Projects\Client.pas=C:\Users\PCuser\Documents\RAD Studio\Projects\Unit3.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.695,C:\Users\PCuser\Documents\RAD Studio\Projects\Client.dfm=C:\Users\PCuser\Documents\RAD Studio\Projects\Unit3.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.357,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\SmallTack.dfm=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.dfm</Transaction>
+    <Transaction>2024-04-30 10:20:51.330,=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>2024-04-30 10:21:45.620,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Friend.pas=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.pas</Transaction>
+    <Transaction>2024-04-30 10:21:45.620,C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Friend.dfm=C:\Users\PCuser\Documents\RAD Studio\TCP_IP_SOCKET_PROGRAM\Unit1.dfm</Transaction>
+  </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="Client.pas"/>
+    <File Path="Client.dfm"/>
+    <File Path="Login.pas"/>
+    <File Path="Login.dfm"/>
+    <File Path="Friend.pas"/>
+    <File Path="Friend.dfm"/>
+  </ProjectSortOrder>
+</BorlandProject>

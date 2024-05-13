@@ -1,0 +1,48 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{2D9544D4-9B26-4EA1-AE82-E33B5E9CC50A}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="TCPserver.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="TCPclient.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="TCPserver">
+			<MSBuild Projects="TCPserver.dproj"/>
+		</Target>
+		<Target Name="TCPserver:Clean">
+			<MSBuild Projects="TCPserver.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="TCPserver:Make">
+			<MSBuild Projects="TCPserver.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="TCPclient">
+			<MSBuild Projects="TCPclient.dproj"/>
+		</Target>
+		<Target Name="TCPclient:Clean">
+			<MSBuild Projects="TCPclient.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="TCPclient:Make">
+			<MSBuild Projects="TCPclient.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="TCPserver;TCPclient"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="TCPserver:Clean;TCPclient:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="TCPserver:Make;TCPclient:Make"/>
+		</Target>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
+	</Project>

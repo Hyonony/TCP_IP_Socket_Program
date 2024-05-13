@@ -1,0 +1,54 @@
+object FormFriendRequest: TFormFriendRequest
+  Left = 0
+  Top = 0
+  Caption = 'FormFriendRequest'
+  ClientHeight = 289
+  ClientWidth = 431
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnCreate = FormCreate
+  PixelsPerInch = 96
+  TextHeight = 13
+  object RequestLabel: TLabel
+    Left = 160
+    Top = 120
+    Width = 179
+    Height = 13
+    Caption = #45784#51032' '#52828#44396' '#50836#52397#51012' '#49688#46973#54616#49884#44192#49845#45768#44620'?'
+  end
+  object UserNameLabel: TLabel
+    Left = 131
+    Top = 120
+    Width = 4
+    Height = 18
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clRed
+    Font.Height = -15
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object AcceptButton: TButton
+    Left = 144
+    Top = 160
+    Width = 75
+    Height = 25
+    Caption = #49688#46973
+    TabOrder = 0
+    OnClick = AcceptButtonClick
+  end
+  object RejectButton: TButton
+    Left = 232
+    Top = 160
+    Width = 75
+    Height = 25
+    Caption = #44144#51208
+    TabOrder = 1
+    OnClick = RejectButtonClick
+  end
+end

@@ -1,0 +1,28 @@
+unit Friend;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TFormFriendRequest = class(TForm)
+    AcceptButton: TButton;
+    RejectButton: TButton;
+    RequestLabel: TLabel;
+    UserNameLabel: TLabel;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  FormFriendRequest: TFormFriendRequest;
+
+implementation
+
+{$R *.dfm}
+
+end.
