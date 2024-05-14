@@ -7,7 +7,8 @@ uses
   Dialogs, IdAntiFreezeBase, IdContext, strutils,
   IdAntiFreeze, IdTCPServer,idsockethandle,
   StdCtrls, IdCustomTCPServer, IdBaseComponent, IdComponent, IdStack,
-  System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr, ConversationList;
+  System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr,
+  ConversationList, System.SyncObjs;
 
 
 type
@@ -79,6 +80,7 @@ type
 
   private
     IsKillClient : Boolean;
+    FLock        : TCriticalSection;
   public
     { Public declarations }
     constructor Create(AOwner: TComponent); override;
@@ -108,6 +110,8 @@ var
   i : Integer;
 begin
   inherited Create(AOwner);
+  FLock := TCriticalSection.Create;
+
   DynamicClientsList := TList<String>.Create;
   Clients := TList.Create;
   Logger := TLogger.Create('server.log');
@@ -125,6 +129,7 @@ end;
 destructor TFormServer.Destroy;
 begin
   Logger.Free;
+  FLock.Free;
   inherited Destroy;
 end;
 
@@ -306,6 +311,7 @@ procedure TFormServer.TCPConnect(AThread: TIdContext);
 var
   Client : TClientThread;
 begin
+  FLock.Enter; // 공유 자원에 대한 접근을 시작하기 전에 잠금
   try
     Client := TClientThread.Create;
     try
@@ -324,14 +330,10 @@ begin
         ShowMessage('클라이언트 연결 처리 중 에러 발생: ' + E.Message);
       end;
     end;
-  except
-    on E: Exception do
-    begin
-      ShowMessage('TCPConnect 중 에러 발생: ' + E.Message);
-    end;
+  finally
+    FLock.Leave; // 작업을 마친 후에 항상 잠금 해제
   end;
 end;
-
 
 // TCP Disconnect
 procedure TFormServer.TCPDisconnect(AThread: TIdContext);
@@ -340,37 +342,23 @@ var
   IndexInClientList, i: Integer;
   IPAndIndex: String;
 begin
-  Client := Pointer(AThread.Data);
-  Client.IP := AThread.Connection.Socket.Binding.PeerIP;
+  FLock.Enter;
+  try
+    Client := Pointer(AThread.Data);
+    Client.IP := AThread.Connection.Socket.Binding.PeerIP;
 
-  Logger.Log('클라이언트 연결 해제됨: ' + Client.IP);
+    Logger.Log('클라이언트 연결 해제됨: ' + Client.IP);
 
-  IndexInClientList := -1;
-  for i := 0 to ClientList.Items.Count - 1 do
-  begin
-    IPAndIndex := ClientList.Items[i];
-    if Pos(Client.IP, IPAndIndex) = 1 then
+    IndexInClientList := -1;
+    for i := 0 to ClientList.Items.Count - 1 do
     begin
-      IndexInClientList := i;
-      Break;
+      IPAndIndex := ClientList.Items[i];
+      if Pos(Client.IP, IPAndIndex) = 1 then
+      begin
+        IndexInClientList := i;
+        Break;
+      end;
     end;
-  end;
-
-  if IndexInClientList > -1 then
-  begin
-    ClientList.Items.Delete(IndexInClientList);
-    Clients.Delete(IndexInClientList);
-    DynamicClientsList.Delete(IndexInClientList);
-
-    for i := IndexInClientList to Clients.Count - 1 do
-    begin
-      TClientThread(Clients[i]).Index := TClientThread(Clients[i]).Index - 1;
-    end;
-  end
-
-  else if IsKillClient then
-  begin
-    IndexInClientList := ClientList.Items.IndexOf(DynamicClientsList[Client.index]);
 
     if IndexInClientList > -1 then
     begin
@@ -382,31 +370,49 @@ begin
       begin
         TClientThread(Clients[i]).Index := TClientThread(Clients[i]).Index - 1;
       end;
-    end;
+    end
 
-    IsKillClient := False;
-  end
-
-  else if ClientList.Items.IndexOf(DynamicClientsList[Client.index])>-1 then
-  begin
-    IndexInClientList := ClientList.Items.IndexOf(DynamicClientsList[Client.index]);
-    ClientList.Items.Delete(IndexInClientList);
-    Clients.Delete(IndexInClientList);
-    DynamicClientsList.Delete(IndexInClientList);
-
-    for i := IndexInClientList to Clients.Count - 1 do
+    else if IsKillClient then
     begin
-      TClientThread(Clients[i]).Index := TClientThread(Clients[i]).Index - 1;
+      IndexInClientList := ClientList.Items.IndexOf(DynamicClientsList[Client.index]);
+
+      if IndexInClientList > -1 then
+      begin
+        ClientList.Items.Delete(IndexInClientList);
+        Clients.Delete(IndexInClientList);
+        DynamicClientsList.Delete(IndexInClientList);
+
+        for i := IndexInClientList to Clients.Count - 1 do
+        begin
+          TClientThread(Clients[i]).Index := TClientThread(Clients[i]).Index - 1;
+        end;
+      end;
+
+      IsKillClient := False;
+    end
+
+    else if ClientList.Items.IndexOf(DynamicClientsList[Client.index]) > -1 then
+    begin
+      IndexInClientList := ClientList.Items.IndexOf(DynamicClientsList[Client.index]);
+      ClientList.Items.Delete(IndexInClientList);
+      Clients.Delete(IndexInClientList);
+      DynamicClientsList.Delete(IndexInClientList);
+
+      for i := IndexInClientList to Clients.Count - 1 do
+      begin
+        TClientThread(Clients[i]).Index := TClientThread(Clients[i]).Index - 1;
+      end;
     end;
+
+    i := Clients.IndexOf(Client);
+    if i > -1 then
+      Clients.Delete(i);
+
+    Client.Free;
+    AThread.Data := nil;
+  finally
+    FLock.Leave;
   end;
-
-
-  i := Clients.IndexOf(Client);
-  if i > -1 then
-    Clients.Delete(i);
-
-  Client.Free;
-  AThread.Data := nil;
 end;
 
 // 데이터 수신 이벤트 처리 메서드
@@ -465,8 +471,10 @@ procedure TFormServer.HandleNickCommand(SenderName: string; AThread: TIdContext)
 var
   Client : TClientThread;
 begin
-  DynamicClientsList.Count := StrToInt(NumClientsText.Caption);
-  if (ClientList.Items.IndexOf(SenderName) < 0) then
+  FLock.Enter;
+  try
+    DynamicClientsList.Count := StrToInt(NumClientsText.Caption);
+    if (ClientList.Items.IndexOf(SenderName) < 0) then
     begin
       if DynamicClientsList.Count < ClientList.Count then
         begin
@@ -494,8 +502,13 @@ begin
       TIdContext(Client.Thread).Connection.Disconnect;
       Logger.Log(('<  Client Connect Error : Someone is already using ID >' + 'name : ' + SenderName));
     end;
+  finally
+    FLock.Leave;
+  end;
+
 end;
 
+// 전체 메시지 송수신 이벤트 핸들러
 // 전체 메시지 송수신 이벤트 핸들러
 procedure TFormServer.HandleEchoCommand(SenderName, MessageText: string);
 var
@@ -504,31 +517,44 @@ var
   AllUserIDs: TList<Integer>;
   Client : TClientThread;
 begin
-  SenderID := FormServer.GetUserIDByUserName(SenderName);
+  SenderID := FormServer.GetUserIDByUserName(SenderName); // 공유 자원 접근 전
 
-  AllUserIDs := FormServer.GetUserIDs(SenderID);
+  FLock.Enter; // 공유 자원 접근 시작
   try
-    for i := 0 to AllUserIDs.Count - 1 do
-    begin
-      UserID := AllUserIDs[i];
-      if (UserID <> SenderID) and IsOnlineClient(UserID) then
+    AllUserIDs := FormServer.GetUserIDs(SenderID);
+    try
+      for i := 0 to AllUserIDs.Count - 1 do
       begin
-        SendMessageToDatabase(SenderID, UserID, MessageText, 'Echo');
-      end
+        UserID := AllUserIDs[i];
+        if (UserID <> SenderID) and IsOnlineClient(UserID) then
+        begin
+          SendMessageToDatabase(SenderID, UserID, MessageText, 'Echo');
+        end
+      end;
+    finally
+      AllUserIDs.Free;
     end;
   finally
-    AllUserIDs.Free;
+    FLock.Leave; // 공유 자원 접근 끝
   end;
 
-  for i := 0 to Clients.Count - 1 do
+  // Clients 리스트에 대한 접근은 공유 자원 접근이 필요하므로 Enter와 Leave를 사용합니다.
+  FLock.Enter; // Clients 리스트 접근 시작
+  try
+    for i := 0 to Clients.Count - 1 do
     begin
       Client := Clients.Items[i];
-      TIdContext(Client.Thread).Connection.IOHandler.WriteLn(SenderName + ' : ' + MessageText);
+      if Assigned(Client) and Assigned(Client.Thread) and Assigned(TIdContext(Client.Thread).Connection) then
+        TIdContext(Client.Thread).Connection.IOHandler.WriteLn(SenderName + ' : ' + MessageText);
     end;
+  finally
+    FLock.Leave; // Clients 리스트 접근 끝
+  end;
 
   Logger.Log(SenderName + ' >> ' + '전체' + ' : '+ MessageText);
   FormServer.MsgMemo.Lines.Add('<Echo>' + '     Client :  ' + SenderName + ' : ' + MessageText);
 end;
+
 
 
 // 친구 등록 이벤트 핸들러
@@ -537,14 +563,20 @@ var
   Client   : TClientThread;
   UserName : string;
 begin
-  UserName := GetUserNameByUserID(ReceiverID);
-  ClientList.Selected[ClientList.Items.IndexOf(UserName)] := true;
-  Client := Clients.Items[ClientList.ItemIndex];
+  FLock.Enter;
+  try
+    UserName := GetUserNameByUserID(ReceiverID);
+    ClientList.Selected[ClientList.Items.IndexOf(UserName)] := true;
+    Client := Clients.Items[ClientList.ItemIndex];
 
-  TIdContext(Client.Thread).Connection.IOHandler.WriteLn('Reqs::' + IntToStr(SenderID) + ':' + IntToStr(ReceiverID));
+    TIdContext(Client.Thread).Connection.IOHandler.WriteLn('Reqs::' + IntToStr(SenderID) + ':' + IntToStr(ReceiverID));
 
-  FormServer.MsgMemo.Lines.Add(IntToStr(SenderID) + ' >> ' + IntToStr(ReceiverID) + ' -- 친구 추가 진행 중 --');
-  Logger.Log('<Client is making a friend> Send Name: ' + IntToStr(SenderID) + ' Receive Name: ' + IntToStr(ReceiverID));
+    FormServer.MsgMemo.Lines.Add(IntToStr(SenderID) + ' >> ' + IntToStr(ReceiverID) + ' -- 친구 추가 진행 중 --');
+    Logger.Log('<Client is making a friend> Send Name: ' + IntToStr(SenderID) + ' Receive Name: ' + IntToStr(ReceiverID));
+  finally
+    FLock.Leave;
+  end;
+
 end;
 
 
@@ -555,27 +587,33 @@ var
   SenderID,ReceiverID : Integer;
   Client  : TClientThread;
 begin
-  RsvName  := Copy(Stream, 1, Pos('>', Stream) - 1);
-  SendName := Copy(Stream, Pos('>', Stream) + 1, Pos(':', Stream) - Pos('>', Stream) - 1);
-  Message  := Copy(Stream, Pos(':', Stream) + 1, MaxInt);
+  FLock.Enter;
+  try
+    RsvName  := Copy(Stream, 1, Pos('>', Stream) - 1);
+    SendName := Copy(Stream, Pos('>', Stream) + 1, Pos(':', Stream) - Pos('>', Stream) - 1);
+    Message  := Copy(Stream, Pos(':', Stream) + 1, MaxInt);
 
-  if ClientList.Items.IndexOf(RsvName) <> -1 then
-  begin
-    ClientList.Selected[ClientList.Items.IndexOf(RsvName)] := True;
-    Client := Clients.Items[ClientList.ItemIndex];
-    TIdContext(Client.Thread).Connection.IOHandler.WriteLn(SendName + ' : ' + Message);
+    if ClientList.Items.IndexOf(RsvName) <> -1 then
+    begin
+      ClientList.Selected[ClientList.Items.IndexOf(RsvName)] := True;
+      Client := Clients.Items[ClientList.ItemIndex];
+      TIdContext(Client.Thread).Connection.IOHandler.WriteLn(SendName + ' : ' + Message);
+    end;
+
+    FormServer.MsgMemo.Lines.Add('<Whisper>' + 'Client :  ' + SendName + ' : ' + Message);
+    Logger.Log(SendName + ' >> ' + RsvName + ' : '+ Message);
+
+    SenderID   := FormServer.GetUserIDByUserName(SendName);
+    ReceiverID := FormServer.GetUserIDByUserName(RsvName);
+
+    if SenderID <> -1 then
+    begin
+      SendMessageToDatabase(SenderID, ReceiverID, Message, 'Whisper');
+    end;
+  finally
+    FLock.Leave;
   end;
 
-  FormServer.MsgMemo.Lines.Add('<Whisper>' + 'Client :  ' + SendName + ' : ' + Message);
-  Logger.Log(SendName + ' >> ' + RsvName + ' : '+ Message);
-
-  SenderID   := FormServer.GetUserIDByUserName(SendName);
-  ReceiverID := FormServer.GetUserIDByUserName(RsvName);
-
-  if SenderID <> -1 then
-  begin
-    SendMessageToDatabase(SenderID, ReceiverID, Message, 'Whisper');
-  end;
 end;
 
 

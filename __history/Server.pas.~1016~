@@ -7,7 +7,8 @@ uses
   Dialogs, IdAntiFreezeBase, IdContext, strutils,
   IdAntiFreeze, IdTCPServer,idsockethandle,
   StdCtrls, IdCustomTCPServer, IdBaseComponent, IdComponent, IdStack,
-  System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr, ConversationList;
+  System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr,
+  ConversationList, System.SyncObjs;
 
 
 type
@@ -79,6 +80,7 @@ type
 
   private
     IsKillClient : Boolean;
+    FLock        : TCriticalSection;
   public
     { Public declarations }
     constructor Create(AOwner: TComponent); override;
@@ -108,6 +110,8 @@ var
   i : Integer;
 begin
   inherited Create(AOwner);
+  FLock := TCriticalSection.Create;
+
   DynamicClientsList := TList<String>.Create;
   Clients := TList.Create;
   Logger := TLogger.Create('server.log');
@@ -125,6 +129,7 @@ end;
 destructor TFormServer.Destroy;
 begin
   Logger.Free;
+  FLock.Free;
   inherited Destroy;
 end;
 
@@ -306,6 +311,7 @@ procedure TFormServer.TCPConnect(AThread: TIdContext);
 var
   Client : TClientThread;
 begin
+  FLock.Enter; // 공유 자원에 대한 접근을 시작하기 전에 잠금
   try
     Client := TClientThread.Create;
     try
@@ -324,14 +330,10 @@ begin
         ShowMessage('클라이언트 연결 처리 중 에러 발생: ' + E.Message);
       end;
     end;
-  except
-    on E: Exception do
-    begin
-      ShowMessage('TCPConnect 중 에러 발생: ' + E.Message);
-    end;
+  finally
+    FLock.Leave; // 작업을 마친 후에 항상 잠금 해제
   end;
 end;
-
 
 // TCP Disconnect
 procedure TFormServer.TCPDisconnect(AThread: TIdContext);
@@ -340,6 +342,8 @@ var
   IndexInClientList, i: Integer;
   IPAndIndex: String;
 begin
+  FLock.Enter;
+
   Client := Pointer(AThread.Data);
   Client.IP := AThread.Connection.Socket.Binding.PeerIP;
 
@@ -392,6 +396,8 @@ begin
     IndexInClientList := ClientList.Items.IndexOf(DynamicClientsList[Client.index]);
     ClientList.Items.Delete(IndexInClientList);
     Clients.Delete(IndexInClientList);
+    DynamicClientsList.Delete(IndexInClientList);
+
     for i := IndexInClientList to Clients.Count - 1 do
     begin
       TClientThread(Clients[i]).Index := TClientThread(Clients[i]).Index - 1;
@@ -411,10 +417,11 @@ end;
 procedure TFormServer.TCPExecute(AThread: TIdContext);
 var
   Stream, Command, SenderName, MessageText, ReceiverName, TempString: string;
-  Client: TClientThread;
 begin
   Stream := AThread.Connection.IOHandler.ReadLn;
   Command := Copy(Stream, 1, Pos(':', Stream));
+
+
 
   // Nickname 중복 검사 기능
   if Command = 'nick:' then
@@ -464,9 +471,10 @@ procedure TFormServer.HandleNickCommand(SenderName: string; AThread: TIdContext)
 var
   Client : TClientThread;
 begin
+  DynamicClientsList.Count := StrToInt(NumClientsText.Caption);
   if (ClientList.Items.IndexOf(SenderName) < 0) then
     begin
-      if StrToInt(NumClientsText.Caption) < ClientList.Count then
+      if DynamicClientsList.Count < ClientList.Count then
         begin
           Client := Clients.Items[ClientList.Count-1];
           TIdContext(Client.Thread).Connection.IOHandler.WriteLn('Limit Exceeded');
