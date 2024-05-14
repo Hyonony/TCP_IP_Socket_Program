@@ -7,7 +7,7 @@ uses
   Dialogs, IdAntiFreezeBase, IdAntiFreeze, IdBaseComponent, IdComponent,strutils,
   IdTCPConnection, IdTCPClient, StdCtrls, IdCmdTCPClient, IdMessage,
   Data.DB, Data.SqlExpr, Data.DbxMySql, FriendRequest, Vcl.ExtCtrls, Register, Conversation,
-  Graphics;
+  Graphics, System.SyncObjs;
 
 
 type
@@ -154,7 +154,7 @@ begin
     CHThread      := TClientHandleThread.Create(True);
 
     CHThread.FreeOnTerminate := True;
-    CHThread.Resume;
+    CHThread.Start;
     Result := True;
     FormClient.TMsgMemo.Lines.Add('Connected.');
 
@@ -220,12 +220,12 @@ begin
     begin
       Msg := ShortString(MidStr(Msg, 6, 255));
       FormClient.ToggleOnlineClients(FormClient.UserName.Text, False);
-      FormClient.TMsgMemo.Lines.Add(Msg);
+      FormClient.TMsgMemo.Lines.Add(string(Msg));
     end
 
   else
     begin
-      FormClient.TMsgMemo.Lines.Add(Msg);
+      FormClient.TMsgMemo.Lines.Add(string(Msg));
     end;
 end;
 
@@ -513,8 +513,6 @@ end;
 
 // Connect DisConnect¿¡ µû¶ó UI Toggle
 procedure TFormClient.SetUIState(Connected: Boolean);
-var
-  I : Integer;
 begin
   ConnectText.Caption       := IfThen(Connected, '  Connect  ', '  Disconnect  ');
 

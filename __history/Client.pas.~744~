@@ -7,7 +7,7 @@ uses
   Dialogs, IdAntiFreezeBase, IdAntiFreeze, IdBaseComponent, IdComponent,strutils,
   IdTCPConnection, IdTCPClient, StdCtrls, IdCmdTCPClient, IdMessage,
   Data.DB, Data.SqlExpr, Data.DbxMySql, FriendRequest, Vcl.ExtCtrls, Register, Conversation,
-  Graphics;
+  Graphics, System.SyncObjs;
 
 
 type
@@ -80,10 +80,10 @@ type
 
 
   private
-    { Private declarations }
+    FLock       : TCriticalSection;
   public
-    OKSignal : Boolean;
-    FriendList : TStringList;
+    OKSignal    : Boolean;
+    FriendList  : TStringList;
 
   end;
 
@@ -175,6 +175,7 @@ var
   TempString, SenderName, ReceiverName : String;
   SendCaptionName : String;
 begin
+
   HandleType   := String(MidStr(Msg, 1, 5));
   stream       := String(RightStr(Msg, length(Msg)-5));
 

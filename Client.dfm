@@ -13,6 +13,7 @@ object FormClient: TFormClient
   OldCreateOrder = False
   OnClose = FormClose
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object lbl1: TLabel

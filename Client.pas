@@ -7,7 +7,7 @@ uses
   Dialogs, IdAntiFreezeBase, IdAntiFreeze, IdBaseComponent, IdComponent,strutils,
   IdTCPConnection, IdTCPClient, StdCtrls, IdCmdTCPClient, IdMessage,
   Data.DB, Data.SqlExpr, Data.DbxMySql, FriendRequest, Vcl.ExtCtrls, Register, Conversation,
-  Graphics;
+  Graphics, System.SyncObjs;
 
 
 type
@@ -76,14 +76,16 @@ type
     procedure ClientListDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
     procedure SearchDataButtonClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
 
 
 
   private
-    { Private declarations }
+    FLock       : TCriticalSection;
   public
-    OKSignal : Boolean;
-    FriendList : TStringList;
+    OKSignal    : Boolean;
+    FriendList  : TStringList;
+
 
   end;
 
@@ -111,10 +113,16 @@ implementation
 procedure TFormClient.FormCreate(Sender: TObject);
 begin
   SetUIState(False);
+  FLock := TCriticalSection.Create;
 
   ConnectToDatabase;
 
   FindFriendName;
+end;
+
+procedure TFormClient.FormDestroy(Sender: TObject);
+begin
+  FLock.Destroy;
 end;
 
 procedure TFormClient.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -175,58 +183,63 @@ var
   TempString, SenderName, ReceiverName : String;
   SendCaptionName : String;
 begin
-  HandleType   := String(MidStr(Msg, 1, 5));
-  stream       := String(RightStr(Msg, length(Msg)-5));
+  FormClient.FLock.Enter;
+  try
+    HandleType   := String(MidStr(Msg, 1, 5));
+    stream       := String(RightStr(Msg, length(Msg)-5));
 
-  TempString    := String(Copy(Msg, Length('reqs::') + 1, MaxInt));
-  SenderName    := String(Copy(TempString, 1, Pos(':', TempString) - 1));
-  ReceiverName  := String(Copy(TempString, Pos(':', TempString) + 1, MaxInt));
+    TempString    := String(Copy(Msg, Length('reqs::') + 1, MaxInt));
+    SenderName    := String(Copy(TempString, 1, Pos(':', TempString) - 1));
+    ReceiverName  := String(Copy(TempString, Pos(':', TempString) + 1, MaxInt));
 
-  if HandleType='list:' then
-    begin
-      FormClient.ClientList.Items.Delimiter     := ':';
-      FormClient.ClientList.Items.DelimitedText := stream
-    end
-
-  else if HandleType = 'Reqs:' then
-    begin
-      UserID          := SenderName;
-      FriendID        := ReceiverName;
-      SendCaptionName := FormClient.GetUserNameByUserID(StrToInt(UserID));
-      if FormClient.IsAlreadyFriends(StrToInt(UserID), StrToInt(FriendID)) then
+    if HandleType='list:' then
       begin
-        Exit;
+        FormClient.ClientList.Items.Delimiter     := ':';
+        FormClient.ClientList.Items.DelimitedText := stream
+      end
+
+    else if HandleType = 'Reqs:' then
+      begin
+        UserID          := SenderName;
+        FriendID        := ReceiverName;
+        SendCaptionName := FormClient.GetUserNameByUserID(StrToInt(UserID));
+        if FormClient.IsAlreadyFriends(StrToInt(UserID), StrToInt(FriendID)) then
+        begin
+          Exit;
+        end;
+
+        if not Assigned(FormFriendRequest) then
+          FormFriendRequest := TFormFriendRequest.Create(Application);
+          FormFriendRequest.UserNameLabel.Caption := SendCaptionName;
+          FormFriendRequest.ShowModal;
+        try
+          if FormFriendRequest.AcceptOK = True then
+            begin
+               FormClient.MakeFriends(StrToInt(UserID), StrToInt(FriendID));
+            end
+          else
+            begin
+               ShowMessage(SendCaptionName + '님의 친구 요청을 거절했습니다.');
+            end;
+        finally
+          FreeAndNil(FormFriendRequest);
+        end;
+      end
+
+    else if HandleType = 'kill:' then
+      begin
+        Msg := ShortString(MidStr(Msg, 6, 255));
+        FormClient.ToggleOnlineClients(FormClient.UserName.Text, False);
+        FormClient.TMsgMemo.Lines.Add(string(Msg));
+      end
+
+    else
+      begin
+        FormClient.TMsgMemo.Lines.Add(string(Msg));
       end;
-
-      if not Assigned(FormFriendRequest) then
-        FormFriendRequest := TFormFriendRequest.Create(Application);
-        FormFriendRequest.UserNameLabel.Caption := SendCaptionName;
-        FormFriendRequest.ShowModal;
-      try
-        if FormFriendRequest.AcceptOK = True then
-          begin
-             FormClient.MakeFriends(StrToInt(UserID), StrToInt(FriendID));
-          end
-        else
-          begin
-             ShowMessage(SendCaptionName + '님의 친구 요청을 거절했습니다.');
-          end;
-      finally
-        FreeAndNil(FormFriendRequest);
-      end;
-    end
-
-  else if HandleType = 'kill:' then
-    begin
-      Msg := ShortString(MidStr(Msg, 6, 255));
-      FormClient.ToggleOnlineClients(FormClient.UserName.Text, False);
-      FormClient.TMsgMemo.Lines.Add(string(Msg));
-    end
-
-  else
-    begin
-      FormClient.TMsgMemo.Lines.Add(string(Msg));
-    end;
+  finally
+    FormClient.FLock.Leave;
+  end;
 end;
 
 

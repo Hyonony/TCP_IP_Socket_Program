@@ -7,7 +7,7 @@ uses
   Dialogs, IdAntiFreezeBase, IdAntiFreeze, IdBaseComponent, IdComponent,strutils,
   IdTCPConnection, IdTCPClient, StdCtrls, IdCmdTCPClient, IdMessage,
   Data.DB, Data.SqlExpr, Data.DbxMySql, FriendRequest, Vcl.ExtCtrls, Register, Conversation,
-  Graphics;
+  Graphics, System.SyncObjs;
 
 
 type
@@ -76,14 +76,15 @@ type
     procedure ClientListDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
     procedure SearchDataButtonClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
 
 
 
   private
-    { Private declarations }
+    FLock       : TCriticalSection;
   public
-    OKSignal : Boolean;
-    FriendList : TStringList;
+    OKSignal    : Boolean;
+    FriendList  : TStringList;
 
   end;
 
@@ -111,10 +112,16 @@ implementation
 procedure TFormClient.FormCreate(Sender: TObject);
 begin
   SetUIState(False);
+  FLock.Create;
 
   ConnectToDatabase;
 
   FindFriendName;
+end;
+
+procedure TFormClient.FormDestroy(Sender: TObject);
+begin
+  FLock.Destroy;
 end;
 
 procedure TFormClient.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -154,7 +161,7 @@ begin
     CHThread      := TClientHandleThread.Create(True);
 
     CHThread.FreeOnTerminate := True;
-    CHThread.Resume;
+    CHThread.Start;
     Result := True;
     FormClient.TMsgMemo.Lines.Add('Connected.');
 
@@ -175,6 +182,7 @@ var
   TempString, SenderName, ReceiverName : String;
   SendCaptionName : String;
 begin
+
   HandleType   := String(MidStr(Msg, 1, 5));
   stream       := String(RightStr(Msg, length(Msg)-5));
 
@@ -220,12 +228,12 @@ begin
     begin
       Msg := ShortString(MidStr(Msg, 6, 255));
       FormClient.ToggleOnlineClients(FormClient.UserName.Text, False);
-      FormClient.TMsgMemo.Lines.Add(ShortString(Msg));
+      FormClient.TMsgMemo.Lines.Add(string(Msg));
     end
 
   else
     begin
-      FormClient.TMsgMemo.Lines.Add(ShortString(Msg));
+      FormClient.TMsgMemo.Lines.Add(string(Msg));
     end;
 end;
 
@@ -513,8 +521,6 @@ end;
 
 // Connect DisConnect¿¡ µû¶ó UI Toggle
 procedure TFormClient.SetUIState(Connected: Boolean);
-var
-  I : Integer;
 begin
   ConnectText.Caption       := IfThen(Connected, '  Connect  ', '  Disconnect  ');
 

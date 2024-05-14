@@ -13,6 +13,7 @@ object FormClient: TFormClient
   OldCreateOrder = False
   OnClose = FormClose
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object lbl1: TLabel
@@ -100,11 +101,11 @@ object FormClient: TFormClient
     Height = 13
   end
   object RedIsSelf: TLabel
-    Left = 617
+    Left = 592
     Top = 126
-    Width = 53
+    Width = 22
     Height = 13
-    Caption = #48744#44053' : '#51088#49888
+    Caption = #51088#49888
     Color = clRed
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clRed
@@ -115,11 +116,11 @@ object FormClient: TFormClient
     ParentFont = False
   end
   object GreenIsFriend: TLabel
-    Left = 617
+    Left = 592
     Top = 145
-    Width = 53
+    Width = 22
     Height = 13
-    Caption = #52488#47197' : '#52828#44396
+    Caption = #52828#44396
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clGreen
     Font.Height = -11
@@ -128,11 +129,11 @@ object FormClient: TFormClient
     ParentFont = False
   end
   object DefaultIsBlack: TLabel
-    Left = 617
+    Left = 592
     Top = 164
-    Width = 53
+    Width = 22
     Height = 13
-    Caption = #44592#48376' : '#44160#51221
+    Caption = #51068#48152
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clBlack
     Font.Height = -11
@@ -295,6 +296,15 @@ object FormClient: TFormClient
     Caption = #54924' '#50896' '#53448' '#53748
     TabOrder = 16
     OnClick = WithdrawButtonClick
+  end
+  object SearchDataButton: TButton
+    Left = 589
+    Top = 299
+    Width = 88
+    Height = 33
+    Caption = #45936#51060#53552' '#44160#49353
+    TabOrder = 17
+    OnClick = SearchDataButtonClick
   end
   object TCP: TIdTCPClient
     OnDisconnected = TcpDisconnected
