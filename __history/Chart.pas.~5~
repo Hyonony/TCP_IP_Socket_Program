@@ -1,0 +1,59 @@
+unit Chart;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VCLTee.TeEngine, Vcl.ExtCtrls,
+  VCLTee.TeeProcs, VCLTee.Chart, Data.DB, Data.SqlExpr;
+
+type
+  TFormChart = class(TForm)
+    Chart: TChart;
+    SQLConnection: TSQLConnection;
+
+
+
+    procedure ConnectToDatabase;
+    procedure FormCreate(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  FormChart: TFormChart;
+
+implementation
+
+{$R *.dfm}
+procedure TFormChart.FormCreate(Sender: TObject);
+begin
+  ConnectToDatabase;
+end;
+
+procedure TFormChart.ConnectToDatabase;
+begin
+  SQLConnection := TSQLConnection.Create(nil);
+  try
+    SQLConnection.DriverName := 'MySQL';
+    SQLConnection.GetDriverFunc := 'getSQLDriverMYSQL';
+    SQLConnection.LibraryName := 'dbxmys.dll';
+    SQLConnection.VendorLib := 'libmysql.dll';
+    SQLConnection.Params.Values['HostName']  := 'localhost'; // 데이터베이스 호스트
+    SQLConnection.Params.Values['Database']  := 'Clients'; // 데이터베이스 이름
+    SQLConnection.Params.Values['User_Name'] := 'root'; // 사용자 이름
+    SQLConnection.Params.Values['Password']  := '1234'; // 비밀번호
+    SQLConnection.LoginPrompt := False;
+    SQLConnection.Connected := True;
+  except
+    on E: Exception do
+      ShowMessage('데이터베이스 연결 실패: ' + E.Message);
+  end;
+end;
+
+
+
+
+end.

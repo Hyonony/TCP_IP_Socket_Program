@@ -8,7 +8,7 @@ uses
   IdAntiFreeze, IdTCPServer,idsockethandle,
   StdCtrls, IdCustomTCPServer, IdBaseComponent, IdComponent, IdStack,
   System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr,
-  ConversationList, System.SyncObjs;
+  ConversationList, System.SyncObjs, Chart;
 
 
 type
@@ -45,6 +45,7 @@ type
     NumClientsText      : TStaticText;
     SQLConnection       : TSQLConnection;
     SearchDataButton    : TButton;
+    ChartButton: TButton;
 
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -56,6 +57,7 @@ type
 
     procedure SendMessageToDatabase(const SenderID, ReceiveID : Integer; MessageText, MessageType : String);
     function IsOnlineClient(UserID : Integer) : Boolean;
+    procedure UpdateConnectCount(const Username: String);
 
     procedure UpdateBindings;
 
@@ -77,6 +79,7 @@ type
     procedure AllSendButtonClick(Sender: TObject);
     procedure ClientsNumBtnClick(Sender: TObject);
     procedure SearchDataButtonClick(Sender: TObject);
+    procedure ChartButtonClick(Sender: TObject);
 
   private
     IsKillClient : Boolean;
@@ -96,6 +99,7 @@ type
 var
   FormServer          : TFormServer;
   FormConversation    : TFormConversation;
+  FormChart           : TFormChart;
   Clients             : TList;
   Logger              : TLogger;
 
@@ -111,8 +115,8 @@ var
 begin
   inherited Create(AOwner);
   FLock := TCriticalSection.Create;
-
   DynamicClientsList := TList<String>.Create;
+
   Clients := TList.Create;
   Logger := TLogger.Create('server.log');
 
@@ -294,6 +298,8 @@ begin
   end;
 end;
 
+
+
 // TCP Binding 설정
 procedure TFormServer.UpdateBindings;
 var Binding : TIdSocketHandle;
@@ -311,7 +317,7 @@ procedure TFormServer.TCPConnect(AThread: TIdContext);
 var
   Client : TClientThread;
 begin
-  FLock.Enter; // 공유 자원에 대한 접근을 시작하기 전에 잠금
+  FLock.Enter;
   try
     Client := TClientThread.Create;
     try
@@ -322,6 +328,7 @@ begin
       Clients.Add(Client);
       ClientList.Items.Add(Client.IP + ' ' + IntToStr(ClientList.Count));
 
+
       Logger.Log('클라이언트 연결됨: ' + Client.IP );
     except
       on E: Exception do
@@ -331,7 +338,7 @@ begin
       end;
     end;
   finally
-    FLock.Leave; // 작업을 마친 후에 항상 잠금 해제
+    FLock.Leave;
   end;
 end;
 
@@ -509,7 +516,6 @@ begin
 end;
 
 // 전체 메시지 송수신 이벤트 핸들러
-// 전체 메시지 송수신 이벤트 핸들러
 procedure TFormServer.HandleEchoCommand(SenderName, MessageText: string);
 var
   SenderID, UserID: Integer;
@@ -623,6 +629,14 @@ begin
   FormConversation := TFormConversation.Create(Application);
 
   FormConversation.ShowModal;
+end;
+
+//접속자 수 차트
+procedure TFormServer.ChartButtonClick(Sender: TObject);
+begin
+  FormChart := TFormChart.Create(Application);
+
+  FormChart.ShowModal;
 end;
 
 // 클라이언트 리스트 숫자 변경 버튼

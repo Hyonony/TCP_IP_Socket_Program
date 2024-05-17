@@ -56,6 +56,7 @@ type
     procedure FindFriendName;
     procedure MakeFriends(const UserID, FriendID: Integer);
     procedure GetLoginTime;
+    procedure UpdateConnectCount(const Username: String);
     procedure ToggleOnlineClients(UserName: String; IsOnline: Boolean);
 
     procedure TcpConnected(Sender: TObject);
@@ -434,6 +435,28 @@ begin
   end;
 end;
 
+procedure TFormClient.UpdateConnectCount(const Username: String);
+var
+  SQLQuery: TSQLQuery;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'UPDATE user SET connectCount = connectCount + 1 WHERE Username = :username;';
+    SQLQuery.Params.ParamByName('Username').AsString     := Username;
+
+    SQLQuery.ExecSQL;
+  finally
+    SQLQuery.Free;
+  end;
+end;
 
 // 마지막 로그인 시간 업데이트 쿼리
 procedure TFormClient.GetLoginTime;
@@ -594,6 +617,8 @@ begin
     if connect then
       begin
         GetLoginTime;
+
+        UpdateConnectCount(UserName.Text);
 
         SetUIState(True);
       end

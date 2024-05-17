@@ -117,7 +117,7 @@ object FormServer: TFormServer
   end
   object SendMsgButton: TButton
     Left = 543
-    Top = 286
+    Top = 292
     Width = 103
     Height = 52
     Caption = #44060#51064' '#53665
@@ -170,12 +170,21 @@ object FormServer: TFormServer
   end
   object SearchDataButton: TButton
     Left = 543
-    Top = 228
+    Top = 241
     Width = 103
     Height = 52
     Caption = #45936#51060#53552' '#44160#49353
     TabOrder = 13
     OnClick = SearchDataButtonClick
+  end
+  object ChartButton: TButton
+    Left = 543
+    Top = 190
+    Width = 103
+    Height = 52
+    Caption = #52264#53944
+    TabOrder = 14
+    OnClick = ChartButtonClick
   end
   object TCP: TIdTCPServer
     Bindings = <>

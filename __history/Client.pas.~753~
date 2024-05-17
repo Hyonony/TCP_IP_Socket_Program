@@ -1,0 +1,761 @@
+unit Client;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Classes, Controls, Forms,
+  Dialogs, IdAntiFreezeBase, IdAntiFreeze, IdBaseComponent, IdComponent,strutils,
+  IdTCPConnection, IdTCPClient, StdCtrls, IdCmdTCPClient, IdMessage,
+  Data.DB, Data.SqlExpr, Data.DbxMySql, FriendRequest, Vcl.ExtCtrls, Register, Conversation,
+  Graphics, System.SyncObjs;
+
+
+type
+  TFormClient = class(TForm)
+    lbl1                : TLabel;
+    lbl2                : TLabel;
+    lbl3                : TLabel;
+    lbl4                : TLabel;
+    lbl5                : TLabel;
+    IPNumber            : TEdit;
+    PortNumber          : TEdit;
+    UserName            : TEdit;
+    TMsgMemo            : TMemo;
+    TSendMsgButton      : TButton;
+    TMessageBox         : TEdit;
+    GetClients          : TButton;
+    ConnectButton       : TButton;
+    DisconnectButton    : TButton;
+    ClientList          : TListBox;
+    TCP                 : TIdTCPClient;
+    idntfrz1            : TIdAntiFreeze;
+    AllSendButton       : TButton;
+    ConnectState        : TStaticText;
+    ConnectText         : TStaticText;
+    TPasswordBox        : TEdit;
+    PassWordLabel       : TLabel;
+    SQLConnection       : TSQLConnection;
+    ConnectNameLabel    : TLabel;
+    FriendButton        : TButton;
+    RegisterButton      : TButton;
+    WithdrawButton      : TButton;
+    RedIsSelf           : TLabel;
+    GreenIsFriend       : TLabel;
+    DefaultIsBlack      : TLabel;
+    SearchDataButton: TButton;
+
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+    procedure ConnectToDatabase;
+    function CheckIdPassword(const UserName, Password: String): Boolean;
+
+    function GetUserIDByUserName(const UserName: String): Integer;
+    function GetUserNameByUserID(const UserID: Integer): String;
+    function IsAlreadyFriends(const UserID, FriendID: Integer): Boolean;
+    procedure FindFriendName;
+    procedure MakeFriends(const UserID, FriendID: Integer);
+    procedure GetLoginTime;
+    procedure UpdateConnectCount(const Username: String);
+    procedure ToggleOnlineClients(UserName: String; IsOnline: Boolean);
+
+    procedure TcpConnected(Sender: TObject);
+    procedure TcpDisconnected(Sender: TObject);
+    Function connect: Boolean;
+
+    procedure UserNameKeyPress(Sender: TObject; var Key: Char);
+    procedure ConnectButtonClick(Sender: TObject);
+    procedure DisconnectButtonClick(Sender: TObject);
+    procedure TSendMsgButtonClick(Sender: TObject);
+    procedure GetClientsClick(Sender: TObject);
+    procedure AllSendButtonClick(Sender: TObject);
+    procedure FriendButtonClick(Sender: TObject);
+    procedure RegisterButtonClick(Sender: TObject);
+    procedure WithdrawButtonClick(Sender: TObject);
+
+    procedure SetUIState(Connected: Boolean);
+    procedure ClientListDrawItem(Control: TWinControl; Index: Integer;
+      Rect: TRect; State: TOwnerDrawState);
+    procedure SearchDataButtonClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+
+
+
+  private
+    FLock       : TCriticalSection;
+  public
+    OKSignal    : Boolean;
+    FriendList  : TStringList;
+
+
+  end;
+
+  TClientHandleThread = Class(TThread)
+  Private
+     Msg:string[100];
+     Procedure HandleInput;
+  Protected
+     Procedure Execute; Override;
+  End;
+
+var
+  FormClient        : TFormClient;
+  FormFriendRequest : TFormFriendRequest;
+  FormRegister      : TFormRegister;
+  FormConversation  : TFormConversation;
+
+  CHThread : TClientHandleThread;
+implementation
+
+{$R *.dfm}
+
+
+// Form 생성자
+procedure TFormClient.FormCreate(Sender: TObject);
+begin
+  SetUIState(False);
+  FLock := TCriticalSection.Create;
+
+  ConnectToDatabase;
+
+  FindFriendName;
+end;
+
+procedure TFormClient.FormDestroy(Sender: TObject);
+begin
+  FLock.Destroy;
+end;
+
+procedure TFormClient.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  ToggleOnlineClients(UserName.Text, False);
+end;
+
+// TCP 연결 시 보내는 패킷
+procedure TFormClient.TcpConnected(Sender : TObject);
+begin
+  TCP.IOHandler.WriteLn(Format('nick::%s', [UserName.Text]));
+  ToggleOnlineClients(UserName.Text, True);
+end;
+
+// TCP 닫힘 시
+procedure TFormClient.TcpDisconnected(Sender: TObject);
+begin
+  FormClient.TMsgMemo.Lines.Add('Disconnected.');
+  ToggleOnlineClients(UserName.Text, False);
+end;
+
+// TCP 연결하라는 신호 왔을 경우 실행되는 메서드
+function TFormClient.Connect: Boolean;
+begin
+  if Tcp.Connected then
+  begin
+    Result := True;
+    ShowMessage('이미 연결 되어있습니다.');
+    Exit;
+  end;
+
+  try
+    Tcp.Host      := IPNumber.Text;
+    Tcp.Port      := StrToInt(PortNumber.Text);
+
+    Tcp.Connect;
+    CHThread      := TClientHandleThread.Create(True);
+
+    CHThread.FreeOnTerminate := True;
+    CHThread.Start;
+    Result := True;
+    FormClient.TMsgMemo.Lines.Add('Connected.');
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('연결 실패: ' + E.Message);
+      Result := False;
+    end;
+  end;
+end;
+
+// Server와 통신하여 이벤트 보내고 받는 부분
+Procedure TClientHandleThread.HandleInput;
+var
+  stream, HandleType  : String;
+  UserID, FriendID    : String;
+  TempString, SenderName, ReceiverName : String;
+  SendCaptionName : String;
+begin
+  FormClient.FLock.Enter;
+  try
+    HandleType   := String(MidStr(Msg, 1, 5));
+    stream       := String(RightStr(Msg, length(Msg)-5));
+
+    TempString    := String(Copy(Msg, Length('reqs::') + 1, MaxInt));
+    SenderName    := String(Copy(TempString, 1, Pos(':', TempString) - 1));
+    ReceiverName  := String(Copy(TempString, Pos(':', TempString) + 1, MaxInt));
+
+    if HandleType='list:' then
+      begin
+        FormClient.ClientList.Items.Delimiter     := ':';
+        FormClient.ClientList.Items.DelimitedText := stream
+      end
+
+    else if HandleType = 'Reqs:' then
+      begin
+        UserID          := SenderName;
+        FriendID        := ReceiverName;
+        SendCaptionName := FormClient.GetUserNameByUserID(StrToInt(UserID));
+        if FormClient.IsAlreadyFriends(StrToInt(UserID), StrToInt(FriendID)) then
+        begin
+          Exit;
+        end;
+
+        if not Assigned(FormFriendRequest) then
+          FormFriendRequest := TFormFriendRequest.Create(Application);
+          FormFriendRequest.UserNameLabel.Caption := SendCaptionName;
+          FormFriendRequest.ShowModal;
+        try
+          if FormFriendRequest.AcceptOK = True then
+            begin
+               FormClient.MakeFriends(StrToInt(UserID), StrToInt(FriendID));
+            end
+          else
+            begin
+               ShowMessage(SendCaptionName + '님의 친구 요청을 거절했습니다.');
+            end;
+        finally
+          FreeAndNil(FormFriendRequest);
+        end;
+      end
+
+    else if HandleType = 'kill:' then
+      begin
+        Msg := ShortString(MidStr(Msg, 6, 255));
+        FormClient.ToggleOnlineClients(FormClient.UserName.Text, False);
+        FormClient.TMsgMemo.Lines.Add(string(Msg));
+      end
+
+    else
+      begin
+        FormClient.TMsgMemo.Lines.Add(string(Msg));
+      end;
+  finally
+    FormClient.FLock.Leave;
+  end;
+end;
+
+
+procedure TClientHandleThread.Execute;
+begin
+While Not Terminated Do
+ Begin
+  IF FormClient.ClientList.Count >= 2 then
+    FormClient.FriendButton.Enabled := True;
+
+  IF Not FormClient.TCP.Connected Then
+    begin
+      Synchronize(procedure
+        begin
+          FormClient.SetUIState(False);
+        end);
+      Terminate;
+      break;
+    end
+  Else
+  Try
+    Msg:=FormClient.Tcp.IOHandler.ReadLn;
+    Synchronize(HandleInput);
+  Except
+  End;
+End;
+end;
+
+// Connect to Database
+procedure TFormClient.ConnectToDatabase;
+begin
+  SQLConnection := TSQLConnection.Create(nil);
+  try
+    SQLConnection.DriverName                := 'MySQL';
+    SQLConnection.GetDriverFunc             := 'getSQLDriverMYSQL';
+    SQLConnection.LibraryName               := 'dbxmys.dll';
+    SQLConnection.VendorLib                 := 'libmysql.dll';
+    SQLConnection.Params.Values['HostName'] := 'localhost';         // 데이터베이스 호스트
+    SQLConnection.Params.Values['Database'] := 'Clients';           // 데이터베이스 이름
+    SQLConnection.Params.Values['User_Name']:= 'root';              // 사용자 이름
+    SQLConnection.Params.Values['Password'] := '1234';              // 비밀번호
+    SQLConnection.LoginPrompt := False;
+    SQLConnection.Connected := True;
+  except
+    on E: Exception do
+      ShowMessage('데이터베이스 연결 실패: ' + E.Message);
+  end;
+end;
+
+// 아이디, 비밀번호 일치 검사 쿼리
+function TFormClient.CheckIdPassword(const UserName, Password: String): Boolean;
+var
+  SQLQuery: TSQLQuery;
+begin
+  Result := False;
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'SELECT 1 FROM user WHERE Username = :Username AND Password = :Password;';
+
+    SQLQuery.ParamByName('UserName').AsString := UserName;
+    SQLQuery.ParamByName('Password').AsString := Password;
+
+    SQLQuery.Open;
+    Result := not SQLQuery.IsEmpty;
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// User Name을 통해 User ID 검출 쿼리
+function TFormClient.GetUserIDByUserName(const UserName: String): Integer;
+var
+  SQLQuery: TSQLQuery;
+begin
+  Result := -1;
+
+  if not SQLConnection.Connected then Exit;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+    SQLQuery.SQL.Text := 'SELECT UserID FROM User WHERE Username = :Username';
+    SQLQuery.Params.ParamByName('Username').AsString := UserName;
+    SQLQuery.Open;
+
+    if not SQLQuery.IsEmpty then
+      Result := SQLQuery.Fields[0].AsInteger;
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// User ID를 통해 User Name 검출 쿼리
+function TFormClient.GetUserNameByUserID(const UserID: Integer): String;
+var
+  SQLQuery: TSQLQuery;
+begin
+  Result := '';
+
+  if not SQLConnection.Connected then Exit;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+    SQLQuery.SQL.Text := 'SELECT Username FROM User WHERE UserID = :UserID';
+    SQLQuery.Params.ParamByName('UserID').AsInteger := UserID;
+    SQLQuery.Open;
+
+    if not SQLQuery.IsEmpty then
+      Result := SQLQuery.Fields[0].AsString; // UserID 값을 반환
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+
+// 이미 친구인지 아닌지 구별하는 쿼리
+function TFormClient.IsAlreadyFriends(const UserID, FriendID: Integer): Boolean;
+var
+  SQLQuery: TSQLQuery;
+begin
+  Result := False;
+
+  if UserID = FriendID then
+  begin
+    ShowMessage('자신에게 친구 추가는 불가능 합니다.');
+    Exit(True);
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'SELECT COUNT(*) FROM Friend ' +
+                         'WHERE (UserID = :UserID AND FriendID = :FriendID) OR ' +
+                         '(UserID = :FriendID AND FriendID = :UserID)';
+
+    SQLQuery.ParamByName('UserID').AsInteger := UserID;
+    SQLQuery.ParamByName('FriendID').AsInteger := FriendID;
+    SQLQuery.Open;
+
+    if SQLQuery.Fields[0].AsInteger > 0 then
+    begin
+      ShowMessage('이미 친구 상태입니다!');
+      Result := True;
+    end;
+
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// 친구 등록 쿼리
+procedure TFormClient.MakeFriends(const UserID, FriendID: Integer);
+var
+  SQLQuery: TSQLQuery;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    if UserID = FriendID then
+    begin
+      ShowMessage('자신에게 친구 추가는 불가능 합니다.');
+      Exit;
+    end;
+
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'INSERT INTO Friend(UserID, FriendID) '+
+                         'VALUES (:UserID, :FriendID), (:FriendID, :UserID)';
+
+    SQLQuery.ParamByName('UserID').AsInteger := UserID;
+    SQLQuery.ParamByName('FriendID').AsInteger := FriendID;
+    SQLQuery.ExecSQL;
+
+    ShowMessage('친구 추가 성공 !');
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+procedure TFormClient.UpdateConnectCount(const Username: String);
+var
+  SQLQuery: TSQLQuery;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'UPDATE user SET connectCount = connectCount + 1 WHERE Username = :username;';
+    SQLQuery.Params.ParamByName('Username').AsString     := Username;
+
+    SQLQuery.ExecSQL;
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// 마지막 로그인 시간 업데이트 쿼리
+procedure TFormClient.GetLoginTime;
+var
+  SQLQuery: TSQLQuery;
+  UserID : Integer;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'UPDATE User SET LastLoginTime = now() WHERE UserID = :UserID;';
+
+    UserID := GetUserIDByUserName(UserName.Text);
+
+    SQLQuery.ParamByName('UserID').AsInteger := UserID;
+
+    SQLQuery.ExecSQL;
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// Online 일경우 0으로 Online 아닐 경우 1로
+procedure TFormClient.ToggleOnlineClients(UserName: String; IsOnline: Boolean);
+var
+  SQLQuery: TSQLQuery;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+    SQLQuery.SQL.Text := 'UPDATE User SET IsOnline = :IsOnline WHERE Username = :Username';
+    SQLQuery.ParamByName('IsOnline').AsBoolean := IsOnline;
+    SQLQuery.ParamByName('Username').AsString := UserName;
+    SQLQuery.ExecSQL;
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// 친구인지 판별하는 쿼리 (List 내에 친구가 있다면 색깔 변경에 필요)
+procedure TFormClient.FindFriendName;
+var
+  SQLQuery: TSQLQuery;
+  UserID: Integer;
+begin
+  if not SQLConnection.Connected then
+  begin
+    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
+    Exit;
+  end;
+
+  if Assigned(FriendList) then
+    FriendList.Clear
+  else
+    FriendList := TStringList.Create;
+
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'SELECT Username FROM user WHERE UserID IN ' +
+                         '(SELECT FriendID FROM friend WHERE UserID = :UserID)';
+    UserID := GetUserIDByUserName(UserName.Text);
+
+    SQLQuery.ParamByName('UserID').AsInteger := UserID;
+    SQLQuery.Open;
+
+    while not SQLQuery.Eof do
+    begin
+      FriendList.Add(SQLQuery.Fields[0].AsString);
+      SQLQuery.Next;
+    end;
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+// Connect DisConnect에 따라 UI Toggle
+procedure TFormClient.SetUIState(Connected: Boolean);
+begin
+  ConnectText.Caption       := IfThen(Connected, '  Connect  ', '  Disconnect  ');
+
+  ConnectButton.Enabled     := not Connected;
+  DisconnectButton.Enabled  := Connected;
+  TSendMsgButton.Enabled    := Connected;
+  GetClients.Enabled        := Connected;
+  AllSendButton.Enabled     := Connected;
+  WithdrawButton.Enabled    := Connected;
+  RegisterButton.Enabled    := not Connected;
+  FriendButton.Enabled      := Connected;
+
+  if Connected then
+  begin
+    ConnectNameLabel.Caption := UserName.Text;
+    ConnectNameLabel.Show;
+    UserName.Hide;
+    TPasswordBox.Hide;
+    PassWordLabel.Hide;
+  end
+  else
+  begin
+    ConnectNameLabel.Hide;
+    UserName.Show;
+    TPasswordBox.Show;
+    PassWordLabel.Show;
+  end;
+
+end;
+
+// List 내에 자신이면 빨강 친구면 초록으로 변경
+procedure TFormClient.ClientListDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+var
+  IsFriend: Boolean;
+begin
+  FindFriendName;
+  with Control as TListBox do
+  begin
+    Canvas.FillRect(Rect);
+
+    IsFriend := FriendList.IndexOf(Items[Index]) <> -1;
+
+    if Items[Index] = UserName.Text then
+      Canvas.Font.Color := clRed
+    else if IsFriend then
+      Canvas.Font.Color := clGreen
+    else
+      Canvas.Font.Color := clWindowText;
+
+    Canvas.TextOut(Rect.Left, Rect.Top, Items[Index]);
+  end;
+end;
+
+// 회원가입 Form 생성
+procedure TFormClient.RegisterButtonClick(Sender: TObject);
+begin
+  FormRegister := TFormRegister.Create(Application);
+  FormRegister.ShowModal;
+end;
+
+// 연결 버튼
+procedure TFormClient.ConnectButtonClick(Sender: TObject);
+begin
+  if CheckIdPassword(UserName.Text, TPasswordBox.Text) then
+  begin
+    if connect then
+      begin
+        GetLoginTime;
+
+        SetUIState(True);
+      end
+    else
+      begin
+        SetUIState(False);
+        ShowMessage('현재 서버가 열려있지 않습니다. ');
+      end;
+  end
+  else
+  begin
+    ShowMessage('사용자 이름 또는 비밀번호가 잘못되었습니다.');
+    SetUIState(False);
+  end;
+end;
+
+// 연결 해체 버튼
+procedure TFormClient.DisconnectButtonClick(Sender: TObject);
+begin
+  ConnectText.Caption       := '  Disconnect  ';
+
+  SetUIState(False);
+
+  TCP.IOHandler.WriteBufferClear;
+  TCP.IOHandler.Inputbuffer.Clear;
+
+  TCP.Disconnect;
+end;
+
+
+// 친구 추가 버튼
+procedure TFormClient.FriendButtonClick(Sender: TObject);
+var
+  SendUserID, RsvUserID : Integer;
+begin
+  if ClientList.ItemIndex > -1 then
+  begin
+    SendUserID := GetUserIDByUserName(UserName.Text);
+    RsvUserID  := GetUserIDByUserName(ClientList.Items[ClientList.ItemIndex]);
+
+    TCP.IOHandler.WriteLn(Format('broo::%d:%d', [SendUserID, RsvUserID]));
+  end
+  else
+    ShowMessage('친구를 추가할 상대를 선택해주세요.');
+end;
+
+// 클라이언트 리스트 받아오는 이벤트
+procedure TFormClient.GetClientsClick(Sender: TObject);
+begin
+  TCP.IOHandler.WriteLn('list:');
+end;
+
+procedure TFormClient.SearchDataButtonClick(Sender: TObject);
+begin
+  FormConversation := TFormConversation.Create(Application);
+
+  FormConversation.ShowModal;
+end;
+// 개인에게 보내는 메시지 버튼
+procedure TFormClient.TSendMsgButtonClick(Sender: TObject);
+var
+  ClientName : String;
+begin
+  ClientName := ClientList.Items.Strings[ClientList.ItemIndex];
+
+  if ClientList.ItemIndex > -1 then
+  begin
+    if ClientName = Username.Text then
+    begin
+      Showmessage('자기 자신에겐 메세지를 전달할 수 없습니다.');
+    end
+    else
+      TCP.IOHandler.WriteLn(ClientList.Items.Strings[ClientList.ItemIndex] + '>'
+      + UserName.Text + ': ' + TMessageBox.Text);
+  end;
+end;
+
+
+// 전체에게 보내는 메시지 버튼
+procedure TFormClient.AllSendButtonClick(Sender: TObject);
+begin
+  TCP.IOHandler.WriteLn(Format('echo::%s:%s', [UserName.Text, TMessageBox.Text]));
+end;
+
+
+procedure TFormClient.UserNameKeyPress(Sender: TObject; var Key: Char);
+begin
+  if Key= '  ' then key := #0;
+end;
+
+
+// 회원탈퇴 기능 버튼
+procedure TFormClient.WithdrawButtonClick(Sender: TObject);
+var
+  SQLQuery: TSQLQuery;
+  UserID : Integer;
+  UserInput: String;
+begin
+  if MessageDlg('정말 회원탈퇴를 하시겠습니까?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if MessageDlg('남은 모든 데이터가 사라지게됩니다. 괜찮으십니까?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    begin
+      UserInput := InputBox('확인', '[삭제하겠습니다]를 입력하세요.', '');
+      if UserInput = '삭제하겠습니다' then
+      begin
+        UserID := GetUserIDByUserName(UserName.Text);
+
+        SQLQuery := TSQLQuery.Create(nil);
+        try
+          SQLQuery.SQLConnection := SQLConnection;
+
+          SQLQuery.SQL.Text := 'DELETE FROM message WHERE SenderID = :UserID OR ReceiveID = :UserID';
+          SQLQuery.Params.ParamByName('UserID').AsInteger := UserID;
+          SQLQuery.ExecSQL;
+
+          SQLQuery.SQL.Text := 'DELETE FROM friend WHERE UserID = :UserID OR FriendID = :UserID';
+          SQLQuery.Params.ParamByName('UserID').AsInteger := UserID;
+          SQLQuery.ExecSQL;
+
+          SQLQuery.SQL.Text := 'DELETE FROM user WHERE UserID = :UserID';
+          SQLQuery.Params.ParamByName('UserID').AsInteger := UserID;
+          SQLQuery.ExecSQL;
+
+          ShowMessage('회원 탈퇴가 완료되었습니다. 모든 데이터가 삭제되었습니다.');
+          TCP.Disconnect;
+        finally
+          SQLQuery.Free;
+        end;
+      end
+      else
+        ShowMessage('문자 입력이 잘못되었습니다. 회원 탈퇴 과정이 취소되었습니다.');
+    end
+    else
+      ShowMessage('회원 탈퇴를 취소했습니다. ');
+  end
+  else
+    ShowMessage('회원 탈퇴를 취소했습니다. ');
+end;
+
+
+
+end.
