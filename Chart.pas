@@ -75,18 +75,21 @@ begin
     BarSeries := TBarSeries.Create(Chart);
     Chart.AddSeries(BarSeries);
 
+    BarSeries.ValueFormat := '0';
+
+    BarSeries.Marks.Style := smsValue;
+
     while not SQLQuery.Eof do
     begin
-
       BarSeries.Add(SQLQuery.FieldByName('connectCount').AsInteger, SQLQuery.FieldByName('Username').AsString);
       SQLQuery.Next;
     end;
+
 
   finally
     SQLQuery.Free;
   end;
 end;
-
 
 
 end.

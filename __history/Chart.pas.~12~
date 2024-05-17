@@ -5,16 +5,20 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VCLTee.TeEngine, Vcl.ExtCtrls,
-  VCLTee.TeeProcs, VCLTee.Chart, Data.DB, Data.SqlExpr;
+  VCLTee.TeeProcs, VCLTee.Chart, Data.DB, Data.SqlExpr, DBXCommon, // TSQLQuery를 위한 유닛
+  VCLTee.TeeData, VCLTee.Series;
 
 type
   TFormChart = class(TForm)
     Chart: TChart;
     SQLConnection: TSQLConnection;
+    LineSeries: TSeriesDataSet;
 
-
+    procedure FormCreate(Sender: TObject);
 
     procedure ConnectToDatabase;
+    procedure LoadDataAndShowChart;
+
   private
     { Private declarations }
   public
@@ -27,6 +31,11 @@ var
 implementation
 
 {$R *.dfm}
+procedure TFormChart.FormCreate(Sender: TObject);
+begin
+  ConnectToDatabase;
+  LoadDataAndShowChart;
+end;
 
 procedure TFormChart.ConnectToDatabase;
 begin
@@ -47,5 +56,37 @@ begin
       ShowMessage('데이터베이스 연결 실패: ' + E.Message);
   end;
 end;
+
+procedure TFormChart.LoadDataAndShowChart;
+var
+  SQLQuery: TSQLQuery;
+  BarSeries: TBarSeries;
+begin
+  SQLQuery := TSQLQuery.Create(nil);
+  try
+    SQLQuery.SQLConnection := SQLConnection;
+
+    SQLQuery.SQL.Text := 'SELECT Username, connectCount FROM user ORDER BY connectCount DESC';
+
+    SQLQuery.Open;
+
+    Chart.View3D := False;
+    Chart.Legend.Visible := False;
+    BarSeries := TBarSeries.Create(Chart);
+    Chart.AddSeries(BarSeries);
+
+    while not SQLQuery.Eof do
+    begin
+
+      BarSeries.Add(SQLQuery.FieldByName('connectCount').AsInteger, SQLQuery.FieldByName('Username').AsString);
+      SQLQuery.Next;
+    end;
+
+  finally
+    SQLQuery.Free;
+  end;
+end;
+
+
 
 end.
