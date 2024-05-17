@@ -40,33 +40,17 @@
 
 ### [DataBase] 회원 가입 기능 추가
 
-* 
-* 
-* 
-
 ---
 
 ### [DataBase] 로그인 기능 추가
-
-* 
-* 
-* 
 
 ---
 
 ### [DataBase] 사용자 별 통신 데이터 삽입 기능 추가
 
-* 
-* 
-* 
-
 ---
 
 ### [DataBase] 친구 추가 기능
-
-* 
-* 
-* 
 
 ---
 
@@ -80,6 +64,10 @@
 
 * Message
 * ![image](https://github.com/Hyonony/TCP_IP_Socket_Program/assets/80375871/38601074-31ce-46b8-a725-606a7cffde90)
+
+---
+
+### 클라이언트 접속 카운트 Chart 구현
 
 ---
 
