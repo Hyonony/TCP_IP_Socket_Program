@@ -426,47 +426,54 @@ var
 begin
   Stream := AThread.Connection.IOHandler.ReadLn;
   Command := Copy(Stream, 1, Pos(':', Stream));
-
-  // Nickname 중복 검사 기능
-  if Command = 'nick:' then
-  begin
-    SenderName := Copy(Stream, Pos(':', Stream) + 2, MaxInt);
-
-    HandleNickCommand(SenderName, AThread);
-  end
-
-  // 현재 접속한 클라이언트 리스트 불러오기
-  else if Command ='list:' then
+  try
+    // Nickname 중복 검사 기능
+    if Command = 'nick:' then
     begin
-      ClientList.Items.Delimiter := ':';
-      AThread.Connection.IOHandler.WriteLn('list:' + ClientList.Items.DelimitedText);
+      SenderName := Copy(Stream, Pos(':', Stream) + 2, MaxInt);
+
+      HandleNickCommand(SenderName, AThread);
     end
 
-  //전체 메시지 핸들러
-  else if Command = 'echo:' then
-    begin
-      TempString  := Copy(Stream, Length('echo::') + 1, MaxInt);
-      SenderName  := Copy(TempString, 1, Pos(':', TempString) - 1);
-      MessageText := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
+    // 현재 접속한 클라이언트 리스트 불러오기
+    else if Command ='list:' then
+      begin
+        ClientList.Items.Delimiter := ':';
+        AThread.Connection.IOHandler.WriteLn('list:' + ClientList.Items.DelimitedText);
+      end
 
-      HandleEchoCommand(SenderName, MessageText);
-    end
+    //전체 메시지 핸들러
+    else if Command = 'echo:' then
+      begin
+        TempString  := Copy(Stream, Length('echo::') + 1, MaxInt);
+        SenderName  := Copy(TempString, 1, Pos(':', TempString) - 1);
+        MessageText := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
 
-  // 친구 추가 핸들러
-  else if Command = 'broo:' then
-    begin
-      TempString    := Copy(Stream, Length('broo::') + 1, MaxInt);
-      SenderName    := Copy(TempString, 1, Pos(':', TempString) - 1);
-      ReceiverName  := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
+        HandleEchoCommand(SenderName, MessageText);
+      end
 
-      HandleBrooCommand(StrToInt(SenderName), StrToInt(ReceiverName));
-    end
+    // 친구 추가 핸들러
+    else if Command = 'broo:' then
+      begin
+        TempString    := Copy(Stream, Length('broo::') + 1, MaxInt);
+        SenderName    := Copy(TempString, 1, Pos(':', TempString) - 1);
+        ReceiverName  := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
 
-  // 개인 메시지 핸들러
-  else if Command = 'whis:' then
+        HandleBrooCommand(StrToInt(SenderName), StrToInt(ReceiverName));
+      end
+
+    else if Command = 'whis:' then
     begin
       HandleOtherCommands(Stream);
     end;
+  except
+    on E: Exception do
+      ShowMessage('Error : ' + E.Message);
+  end;
+  
+
+  // 개인 메시지 핸들러
+  
   end;
 
 

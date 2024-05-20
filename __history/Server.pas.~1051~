@@ -4,11 +4,10 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Controls, Forms,
-  Dialogs, IdAntiFreezeBase, IdContext, strutils,
-  IdAntiFreeze, IdTCPServer,idsockethandle,
+  Dialogs, IdContext, strutils,IdTCPServer,idsockethandle,
   StdCtrls, IdCustomTCPServer, IdBaseComponent, IdComponent, IdStack,
   System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr,
-  ConversationList, System.SyncObjs, Chart;
+  ConversationList, System.SyncObjs, Chart, IdAntiFreezeBase, Vcl.IdAntiFreeze;
 
 
 type
@@ -29,11 +28,11 @@ type
     PortNumber          : TEdit;
     EnableBtn           : TButton;
     TCP                 : TIdTCPServer;
-    IdAntiFreeze1       : TIdAntiFreeze;
     lbl1                : TLabel;
     lbl2                : TLabel;
     lbl3                : TLabel;
     KillClientButton    : TButton;
+    IdAntiFreeze1       : TIdAntiFreeze;
     ClientList          : TListBox;
     MsgMemo             : TMemo;
     MessageBox          : TEdit;
@@ -57,7 +56,6 @@ type
 
     procedure SendMessageToDatabase(const SenderID, ReceiveID : Integer; MessageText, MessageType : String);
     function IsOnlineClient(UserID : Integer) : Boolean;
-    procedure UpdateConnectCount(const Username: String);
 
     procedure UpdateBindings;
 
@@ -298,28 +296,6 @@ begin
   end;
 end;
 
-procedure TFormServer.UpdateConnectCount(const Username: String);
-var
-  SQLQuery: TSQLQuery;
-begin
-  if not SQLConnection.Connected then
-  begin
-    ShowMessage('데이터베이스에 연결되어 있지 않습니다.');
-    Exit;
-  end;
-
-  SQLQuery := TSQLQuery.Create(nil);
-  try
-    SQLQuery.SQLConnection := SQLConnection;
-
-    SQLQuery.SQL.Text := 'UPDATE user SET connectCount = connectCount + 1 WHERE Username = :username;';
-    SQLQuery.Params.ParamByName('Username').AsString     := Username;
-
-    SQLQuery.ExecSQL;
-  finally
-    SQLQuery.Free;
-  end;
-end;
 
 // TCP Binding 설정
 procedure TFormServer.UpdateBindings;
@@ -337,7 +313,6 @@ end;
 procedure TFormServer.TCPConnect(AThread: TIdContext);
 var
   Client : TClientThread;
-  Username: string;
 begin
   FLock.Enter;
   try
@@ -350,8 +325,6 @@ begin
       Clients.Add(Client);
       ClientList.Items.Add(Client.IP + ' ' + IntToStr(ClientList.Count));
 
-      Username := ClientList.Items.IndexOfName;
-      UpdateConnectCount(Username);
 
       Logger.Log('클라이언트 연결됨: ' + Client.IP );
     except
@@ -453,51 +426,58 @@ var
 begin
   Stream := AThread.Connection.IOHandler.ReadLn;
   Command := Copy(Stream, 1, Pos(':', Stream));
-
-  // Nickname 중복 검사 기능
-  if Command = 'nick:' then
-  begin
-    SenderName := Copy(Stream, Pos(':', Stream) + 2, MaxInt);
-
-    HandleNickCommand(SenderName, AThread);
-  end
-
-  // 현재 접속한 클라이언트 리스트 불러오기
-  else if Command ='list:' then
+  try
+    // Nickname 중복 검사 기능
+    if Command = 'nick:' then
     begin
-      ClientList.Items.Delimiter := ':';
-      AThread.Connection.IOHandler.WriteLn('list:' + ClientList.Items.DelimitedText);
+      SenderName := Copy(Stream, Pos(':', Stream) + 2, MaxInt);
+
+      HandleNickCommand(SenderName, AThread);
     end
 
-  //전체 메시지 핸들러
-  else if Command = 'echo:' then
-    begin
-      TempString  := Copy(Stream, Length('echo::') + 1, MaxInt);
-      SenderName  := Copy(TempString, 1, Pos(':', TempString) - 1);
-      MessageText := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
+    // 현재 접속한 클라이언트 리스트 불러오기
+    else if Command ='list:' then
+      begin
+        ClientList.Items.Delimiter := ':';
+        AThread.Connection.IOHandler.WriteLn('list:' + ClientList.Items.DelimitedText);
+      end
 
-      HandleEchoCommand(SenderName, MessageText);
-    end
+    //전체 메시지 핸들러
+    else if Command = 'echo:' then
+      begin
+        TempString  := Copy(Stream, Length('echo::') + 1, MaxInt);
+        SenderName  := Copy(TempString, 1, Pos(':', TempString) - 1);
+        MessageText := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
 
-  // 친구 추가 핸들러
-  else if Command = 'broo:' then
-    begin
-      TempString    := Copy(Stream, Length('broo::') + 1, MaxInt);
-      SenderName    := Copy(TempString, 1, Pos(':', TempString) - 1);
-      ReceiverName  := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
+        HandleEchoCommand(SenderName, MessageText);
+      end
 
-      HandleBrooCommand(StrToInt(SenderName), StrToInt(ReceiverName));
-    end
+    // 친구 추가 핸들러
+    else if Command = 'broo:' then
+      begin
+        TempString    := Copy(Stream, Length('broo::') + 1, MaxInt);
+        SenderName    := Copy(TempString, 1, Pos(':', TempString) - 1);
+        ReceiverName  := Copy(TempString, Pos(':', TempString) + 1, MaxInt);
 
-  // 개인 메시지 핸들러
-  else
+        HandleBrooCommand(StrToInt(SenderName), StrToInt(ReceiverName));
+      end
+
+    else if Command = 'whis:' then
     begin
       HandleOtherCommands(Stream);
     end;
+  except
+    on E: Exception do
+      ShowMessage('Error : ' + E);
+  end;
+  
+
+  // 개인 메시지 핸들러
+  
   end;
 
 
-// 닉네임 검사 이벤트 핸들러
+// 클라이언트 서버 연결 시 닉네임 검사 이벤트 핸들러
 procedure TFormServer.HandleNickCommand(SenderName: string; AThread: TIdContext);
 var
   Client : TClientThread;
@@ -568,7 +548,6 @@ begin
     FLock.Leave; // 공유 자원 접근 끝
   end;
 
-  // Clients 리스트에 대한 접근은 공유 자원 접근이 필요하므로 Enter와 Leave를 사용합니다.
   FLock.Enter; // Clients 리스트 접근 시작
   try
     for i := 0 to Clients.Count - 1 do
@@ -613,15 +592,18 @@ end;
 // 개인 메시지 송수신 이벤트 핸들러
 procedure TFormServer.HandleOtherCommands(Stream: string);
 var
-  RsvName, SendName, Message: string;
+  RsvName, SendName, Message, SeparatorPos: string;
   SenderID,ReceiverID : Integer;
   Client  : TClientThread;
 begin
   FLock.Enter;
   try
-    RsvName  := Copy(Stream, 1, Pos('>', Stream) - 1);
-    SendName := Copy(Stream, Pos('>', Stream) + 1, Pos(':', Stream) - Pos('>', Stream) - 1);
-    Message  := Copy(Stream, Pos(':', Stream) + 1, MaxInt);
+    Stream := Copy(Stream, 7, MaxInt);
+
+    RsvName := Copy(Stream, 1, Pos('>', Stream) - 1);
+    Stream := Copy(Stream, Pos('>', Stream) + 1, MaxInt);
+    SendName := Copy(Stream, 1,  Pos(':', Stream) - 1);
+    Message := Copy(Stream,  Pos(':', Stream) + 1, MaxInt);
 
     if ClientList.Items.IndexOf(RsvName) <> -1 then
     begin

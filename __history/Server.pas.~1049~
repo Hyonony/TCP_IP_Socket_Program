@@ -4,11 +4,10 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Controls, Forms,
-  Dialogs, IdAntiFreezeBase, IdContext, strutils,
-  IdAntiFreeze, IdTCPServer,idsockethandle,
+  Dialogs, IdContext, strutils,IdTCPServer,idsockethandle,
   StdCtrls, IdCustomTCPServer, IdBaseComponent, IdComponent, IdStack,
   System.Generics.Collections, DB, Data.DbxMySql,Data.SqlExpr,
-  ConversationList, System.SyncObjs, Chart;
+  ConversationList, System.SyncObjs, Chart, IdAntiFreezeBase, Vcl.IdAntiFreeze;
 
 
 type
@@ -29,11 +28,11 @@ type
     PortNumber          : TEdit;
     EnableBtn           : TButton;
     TCP                 : TIdTCPServer;
-    IdAntiFreeze1       : TIdAntiFreeze;
     lbl1                : TLabel;
     lbl2                : TLabel;
     lbl3                : TLabel;
     KillClientButton    : TButton;
+    IdAntiFreeze1       : TIdAntiFreeze;
     ClientList          : TListBox;
     MsgMemo             : TMemo;
     MessageBox          : TEdit;
@@ -57,7 +56,6 @@ type
 
     procedure SendMessageToDatabase(const SenderID, ReceiveID : Integer; MessageText, MessageType : String);
     function IsOnlineClient(UserID : Integer) : Boolean;
-    procedure UpdateConnectCount(const Username: String);
 
     procedure UpdateBindings;
 
@@ -299,7 +297,6 @@ begin
 end;
 
 
-
 // TCP Binding 설정
 procedure TFormServer.UpdateBindings;
 var Binding : TIdSocketHandle;
@@ -466,14 +463,14 @@ begin
     end
 
   // 개인 메시지 핸들러
-  else
+  else if Command = 'whis:' then
     begin
       HandleOtherCommands(Stream);
     end;
   end;
 
 
-// 닉네임 검사 이벤트 핸들러
+// 클라이언트 서버 연결 시 닉네임 검사 이벤트 핸들러
 procedure TFormServer.HandleNickCommand(SenderName: string; AThread: TIdContext);
 var
   Client : TClientThread;
@@ -544,7 +541,6 @@ begin
     FLock.Leave; // 공유 자원 접근 끝
   end;
 
-  // Clients 리스트에 대한 접근은 공유 자원 접근이 필요하므로 Enter와 Leave를 사용합니다.
   FLock.Enter; // Clients 리스트 접근 시작
   try
     for i := 0 to Clients.Count - 1 do
@@ -589,15 +585,18 @@ end;
 // 개인 메시지 송수신 이벤트 핸들러
 procedure TFormServer.HandleOtherCommands(Stream: string);
 var
-  RsvName, SendName, Message: string;
+  RsvName, SendName, Message, SeparatorPos: string;
   SenderID,ReceiverID : Integer;
   Client  : TClientThread;
 begin
   FLock.Enter;
   try
-    RsvName  := Copy(Stream, 1, Pos('>', Stream) - 1);
-    SendName := Copy(Stream, Pos('>', Stream) + 1, Pos(':', Stream) - Pos('>', Stream) - 1);
-    Message  := Copy(Stream, Pos(':', Stream) + 1, MaxInt);
+    Stream := Copy(Stream, 7, MaxInt);
+
+    RsvName := Copy(Stream, 1, Pos('>', Stream) - 1);
+    Stream := Copy(Stream, Pos('>', Stream) + 1, MaxInt);
+    SendName := Copy(Stream, 1,  Pos(':', Stream) - 1);
+    Message := Copy(Stream,  Pos(':', Stream) + 1, MaxInt);
 
     if ClientList.Items.IndexOf(RsvName) <> -1 then
     begin
