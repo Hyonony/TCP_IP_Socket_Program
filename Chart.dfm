@@ -17,9 +17,9 @@ object FormChart: TFormChart
   TextHeight = 13
   object Chart: TChart
     Left = 8
-    Top = 32
-    Width = 519
-    Height = 369
+    Top = 8
+    Width = 535
+    Height = 404
     Title.Font.Color = clRed
     Title.Font.Height = -16
     Title.Font.Name = 'Bahnschrift Light'
